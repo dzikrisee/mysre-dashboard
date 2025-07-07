@@ -1,8 +1,8 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  /* config options here */
-  reactStrictMode: true,
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    appDir: true, // Ini untuk versi Next.js lama, di versi baru sudah default
+  },
 };
 
-export default nextConfig;
+module.exports = nextConfig;
