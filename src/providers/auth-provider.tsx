@@ -44,7 +44,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === 'SIGNED_IN' && session?.user) {
         await fetchUserProfile(session.user.id);
         // Auto redirect ke dashboard setelah login (hanya admin)
-        const { data: userData } = await supabase.from('users').select('role').eq('id', session.user.id).single();
+        const { data: userData } = await supabase
+          .from('User') // Updated ke tabel User
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
 
         if (userData?.role === 'admin') {
           router.push('/dashboard');
@@ -61,15 +65,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const fetchUserProfile = async (userId: string) => {
-    const { data, error } = await supabase.from('users').select('*').eq('id', userId).single();
+    const { data, error } = await supabase
+      .from('User') // Updated ke tabel User
+      .select('*')
+      .eq('id', userId)
+      .single();
 
     if (data && !error) {
       setUser({
         id: data.id,
         email: data.email,
-        full_name: data.full_name,
+        name: data.name, // Updated dari full_name ke name
         role: data.role,
         avatar_url: data.avatar_url,
+        group: data.group,
+        nim: data.nim,
       });
     }
   };
@@ -78,18 +88,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       let email = identifier;
 
-      // Jika identifier bukan email, cari email berdasarkan username
+      // Jika identifier bukan email, cari email berdasarkan NIM
       if (!identifier.includes('@')) {
-        const { data: userData, error: userError } = await supabase.from('users').select('email').eq('username', identifier).single();
+        const { data: userData, error: userError } = await supabase
+          .from('User') // Updated ke tabel User
+          .select('email')
+          .eq('nim', identifier) // Updated dari username ke nim
+          .single();
 
         if (userError || !userData) {
           notifications.show({
             title: 'Error',
-            message: 'Username tidak ditemukan',
+            message: 'NIM tidak ditemukan', // Updated pesan error
             color: 'red',
             icon: <IconX size={16} />,
           });
-          return { success: false, error: 'Username tidak ditemukan' };
+          return { success: false, error: 'NIM tidak ditemukan' };
         }
 
         email = userData.email;
@@ -103,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         notifications.show({
           title: 'Error',
-          message: 'Email/Username atau password salah',
+          message: 'Email/NIM atau password salah', // Updated pesan error
           color: 'red',
           icon: <IconX size={16} />,
         });
@@ -112,7 +126,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (data.user) {
         // Cek apakah user adalah admin
-        const { data: userData, error: userError } = await supabase.from('users').select('*').eq('id', data.user.id).single();
+        const { data: userData, error: userError } = await supabase
+          .from('User') // Updated ke tabel User
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
 
         if (userError || !userData || userData.role !== 'admin') {
           // Logout user yang bukan admin
@@ -128,7 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         notifications.show({
           title: 'Berhasil',
-          message: `Selamat datang, ${userData.full_name}!`,
+          message: `Selamat datang, ${userData.name}!`, // Updated dari full_name ke name
           color: 'green',
           icon: <IconCheck size={16} />,
         });
@@ -160,7 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password,
         options: {
           data: {
-            full_name: fullName,
+            name: fullName, // Updated dari full_name ke name
           },
         },
       });
@@ -175,7 +193,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: error.message };
       }
 
-      // 2. Jika berhasil dan ada user, insert ke tabel users
+      // 2. Jika berhasil dan ada user, insert ke tabel User
       if (data.user && !data.user.email_confirmed_at) {
         // User perlu konfirmasi email dulu
         notifications.show({
@@ -189,12 +207,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // 3. Jika user langsung aktif, insert profil
       if (data.user && data.user.email_confirmed_at) {
-        const { error: profileError } = await supabase.from('users').insert({
-          id: data.user.id,
-          email: data.user.email!,
-          full_name: fullName,
-          role: 'user',
-        });
+        const { error: profileError } = await supabase
+          .from('User') // Updated ke tabel User
+          .insert({
+            id: data.user.id,
+            email: data.user.email!,
+            name: fullName, // Updated dari full_name ke name
+            role: 'user',
+          });
 
         if (profileError) {
           console.error('Profile insert error:', profileError);
@@ -223,45 +243,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-
-    if (!error) {
-      notifications.show({
-        title: 'Berhasil',
-        message: 'Anda berhasil keluar',
-        color: 'green',
-        icon: <IconCheck size={16} />,
-      });
-
-      // Redirect ke halaman auth setelah logout
-      router.push('/auth');
-    }
+    await supabase.auth.signOut();
+    setUser(null);
+    router.push('/auth');
   };
 
   const isAdmin = () => {
     return user?.role === 'admin';
   };
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        signIn,
-        signOut,
-        isAdmin,
-      }}
-    >
-      {loading && <LoadingOverlay visible />}
-      {children}
-    </AuthContext.Provider>
-  );
+  if (loading) {
+    return <LoadingOverlay visible />;
+  }
+
+  return <AuthContext.Provider value={{ user, loading, signIn, signOut, isAdmin }}>{children}</AuthContext.Provider>;
 }
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
+}

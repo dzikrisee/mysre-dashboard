@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Table, Avatar, Badge, Group, Text, ActionIcon, Menu, Button, Paper, TextInput, Select, Stack, Flex, Box, ScrollArea, Pagination, Card, Title, LoadingOverlay } from '@mantine/core';
-import { IconDots, IconEdit, IconTrash, IconPlus, IconSearch, IconFilter, IconUserCheck, IconUserX } from '@tabler/icons-react';
+import { Table, Avatar, Badge, Group, Text, ActionIcon, Menu, Button, Paper, TextInput, Select, Stack, Flex, Box, ScrollArea, Pagination, Card, Title, LoadingOverlay, Tabs } from '@mantine/core';
+import { IconDots, IconEdit, IconTrash, IconPlus, IconSearch, IconFilter, IconUserCheck, IconUserX, IconUsers, IconSchool, IconId } from '@tabler/icons-react';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { supabase, User } from '@/lib/supabase';
@@ -18,29 +18,52 @@ export function UserTable({ onUserSelect }: UserTableProps) {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('');
+  const [groupFilter, setGroupFilter] = useState<string>('');
   const [activePage, setActivePage] = useState(1);
   const [total, setTotal] = useState(0);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('all');
 
   const { isAdmin } = useAuth();
   const pageSize = 10;
 
   useEffect(() => {
     fetchUsers();
-  }, [activePage, searchQuery, roleFilter]);
+  }, [activePage, searchQuery, roleFilter, groupFilter, activeTab]);
 
   const fetchUsers = async () => {
     setLoading(true);
 
-    let query = supabase.from('users').select('*', { count: 'exact' }).order('created_at', { ascending: false });
+    let query = supabase
+      .from('User') // Updated ke tabel User
+      .select('*', { count: 'exact' })
+      .order('createdAt', { ascending: false }); // Updated dari created_at ke createdAt
 
-    if (searchQuery) {
-      query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
+    // Filter berdasarkan tab aktif
+    if (activeTab === 'admin') {
+      query = query.eq('role', 'admin');
+    } else if (activeTab === 'students') {
+      query = query.eq('role', 'user');
+    } else if (activeTab === 'group-a') {
+      query = query.eq('group', 'A');
+    } else if (activeTab === 'group-b') {
+      query = query.eq('group', 'B');
     }
 
-    if (roleFilter) {
+    // Filter pencarian
+    if (searchQuery) {
+      query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,nim.ilike.%${searchQuery}%`); // Updated dari full_name ke name, tambah nim
+    }
+
+    // Filter role (jika tidak menggunakan tab)
+    if (roleFilter && activeTab === 'all') {
       query = query.eq('role', roleFilter);
+    }
+
+    // Filter group (jika tidak menggunakan tab)
+    if (groupFilter && activeTab === 'all') {
+      query = query.eq('group', groupFilter);
     }
 
     const from = (activePage - 1) * pageSize;
@@ -54,6 +77,7 @@ export function UserTable({ onUserSelect }: UserTableProps) {
         message: 'Gagal memuat data pengguna',
         color: 'red',
       });
+      console.error('Error fetching users:', error);
     } else {
       setUsers(data || []);
       setTotal(count || 0);
@@ -67,13 +91,16 @@ export function UserTable({ onUserSelect }: UserTableProps) {
       title: 'Hapus Pengguna',
       children: (
         <Text size="sm">
-          Apakah Anda yakin ingin menghapus pengguna <strong>{user.full_name}</strong>? Tindakan ini tidak dapat dibatalkan.
+          Apakah Anda yakin ingin menghapus pengguna <strong>{user.name}</strong>? Tindakan ini tidak dapat dibatalkan.
         </Text>
       ),
       labels: { confirm: 'Hapus', cancel: 'Batal' },
       confirmProps: { color: 'red' },
       onConfirm: async () => {
-        const { error } = await supabase.from('users').delete().eq('id', user.id);
+        const { error } = await supabase
+          .from('User') // Updated ke tabel User
+          .delete()
+          .eq('id', user.id);
 
         if (error) {
           notifications.show({
@@ -118,22 +145,66 @@ export function UserTable({ onUserSelect }: UserTableProps) {
           )}
         </Group>
 
-        {/* Filters */}
-        <Group mb="md">
-          <TextInput placeholder="Cari nama atau email..." leftSection={<IconSearch size={16} />} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ flex: 1 }} />
-          <Select
-            placeholder="Filter Role"
-            leftSection={<IconFilter size={16} />}
-            data={[
-              { value: '', label: 'Semua Role' },
-              { value: 'admin', label: 'Administrator' },
-              { value: 'user', label: 'Pengguna' },
-            ]}
-            value={roleFilter}
-            onChange={(value) => setRoleFilter(value || '')}
-            clearable
-          />
-        </Group>
+        {/* Tabs untuk filter cepat */}
+        <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'all')} mb="md">
+          <Tabs.List>
+            <Tabs.Tab value="all" leftSection={<IconUsers size={16} />}>
+              Semua ({total})
+            </Tabs.Tab>
+            <Tabs.Tab value="admin" leftSection={<IconUserCheck size={16} />}>
+              Administrator
+            </Tabs.Tab>
+            <Tabs.Tab value="students" leftSection={<IconSchool size={16} />}>
+              Mahasiswa
+            </Tabs.Tab>
+            <Tabs.Tab value="group-a" leftSection={<IconId size={16} />}>
+              Grup A
+            </Tabs.Tab>
+            <Tabs.Tab value="group-b" leftSection={<IconId size={16} />}>
+              Grup B
+            </Tabs.Tab>
+          </Tabs.List>
+        </Tabs>
+
+        {/* Filters - Hanya tampil di tab 'all' */}
+        {activeTab === 'all' && (
+          <Group mb="md">
+            <TextInput placeholder="Cari nama, email, atau NIM..." leftSection={<IconSearch size={16} />} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ flex: 1 }} />
+            <Select
+              placeholder="Filter Role"
+              leftSection={<IconFilter size={16} />}
+              data={[
+                { value: '', label: 'Semua Role' },
+                { value: 'admin', label: 'Administrator' },
+                { value: 'user', label: 'Mahasiswa' },
+              ]}
+              value={roleFilter}
+              onChange={(value) => setRoleFilter(value || '')}
+              clearable
+              w={200}
+            />
+            <Select
+              placeholder="Filter Group"
+              leftSection={<IconFilter size={16} />}
+              data={[
+                { value: '', label: 'Semua Group' },
+                { value: 'A', label: 'Group A' },
+                { value: 'B', label: 'Group B' },
+              ]}
+              value={groupFilter}
+              onChange={(value) => setGroupFilter(value || '')}
+              clearable
+              w={200}
+            />
+          </Group>
+        )}
+
+        {/* Pencarian untuk tab selain 'all' */}
+        {activeTab !== 'all' && (
+          <Group mb="md">
+            <TextInput placeholder="Cari nama, email, atau NIM..." leftSection={<IconSearch size={16} />} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ flex: 1 }} />
+          </Group>
+        )}
 
         {/* Table */}
         <Paper withBorder radius="md" style={{ position: 'relative' }}>
@@ -145,20 +216,22 @@ export function UserTable({ onUserSelect }: UserTableProps) {
                   <Table.Th>Pengguna</Table.Th>
                   <Table.Th>Email</Table.Th>
                   <Table.Th>Role</Table.Th>
+                  <Table.Th>Group</Table.Th>
+                  <Table.Th>NIM</Table.Th>
                   <Table.Th>Bergabung</Table.Th>
                   {isAdmin() && <Table.Th>Aksi</Table.Th>}
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
                 {users.map((user) => (
-                  <Table.Tr key={user.id} style={{ cursor: 'pointer' }}>
+                  <Table.Tr key={user.id} style={{ cursor: onUserSelect ? 'pointer' : 'default' }} onClick={() => onUserSelect?.(user)}>
                     <Table.Td>
                       <Group gap="sm">
-                        <Avatar src={user.avatar_url} alt={user.full_name} size="sm" color="blue">
-                          {user.full_name.charAt(0)}
+                        <Avatar src={user.avatar_url} alt={user.name} size="sm" color="blue">
+                          {user.name.charAt(0)} {/* Updated dari full_name ke name */}
                         </Avatar>
                         <Text size="sm" fw={500}>
-                          {user.full_name}
+                          {user.name} {/* Updated dari full_name ke name */}
                         </Text>
                       </Group>
                     </Table.Td>
@@ -169,12 +242,28 @@ export function UserTable({ onUserSelect }: UserTableProps) {
                     </Table.Td>
                     <Table.Td>
                       <Badge color={user.role === 'admin' ? 'red' : 'blue'} variant="light" leftSection={user.role === 'admin' ? <IconUserCheck size={12} /> : <IconUserX size={12} />}>
-                        {user.role === 'admin' ? 'Administrator' : 'Pengguna'}
+                        {user.role === 'admin' ? 'Administrator' : 'Mahasiswa'}
                       </Badge>
                     </Table.Td>
                     <Table.Td>
+                      {user.group ? (
+                        <Badge color={user.group === 'A' ? 'green' : 'orange'} variant="outline">
+                          Group {user.group}
+                        </Badge>
+                      ) : (
+                        <Text size="sm" c="gray.5">
+                          -
+                        </Text>
+                      )}
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="sm" c="gray.7" ff="monospace">
+                        {user.nim || '-'}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
                       <Text size="sm" c="gray.7">
-                        {new Date(user.created_at).toLocaleDateString('id-ID')}
+                        {new Date(user.createdAt).toLocaleDateString('id-ID')} {/* Updated dari created_at ke createdAt */}
                       </Text>
                     </Table.Td>
                     {isAdmin() && (
@@ -204,7 +293,9 @@ export function UserTable({ onUserSelect }: UserTableProps) {
 
           {users.length === 0 && !loading && (
             <Box p="xl" ta="center">
-              <Text c="gray.5">Tidak ada data pengguna</Text>
+              <Text c="gray.5">
+                {activeTab === 'all' ? 'Tidak ada data pengguna' : `Tidak ada data untuk ${activeTab === 'admin' ? 'administrator' : activeTab === 'students' ? 'mahasiswa' : activeTab === 'group-a' ? 'Group A' : 'Group B'}`}
+              </Text>
             </Box>
           )}
         </Paper>
@@ -220,6 +311,7 @@ export function UserTable({ onUserSelect }: UserTableProps) {
         <Group justify="space-between" mt="md">
           <Text size="sm" c="gray.6">
             Menampilkan {users.length} dari {total} pengguna
+            {activeTab !== 'all' && <> • Filter: {activeTab === 'admin' ? 'Administrator' : activeTab === 'students' ? 'Mahasiswa' : activeTab === 'group-a' ? 'Group A' : 'Group B'}</>}
           </Text>
         </Group>
       </Card>

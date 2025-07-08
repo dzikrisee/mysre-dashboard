@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { Grid, Card, Text, Group, Avatar, Stack, Badge, ActionIcon, Title, SimpleGrid, Progress, RingProgress, Center, ThemeIcon, Box } from '@mantine/core';
-import { IconUsers, IconUserPlus, IconUserCheck, IconTrendingUp, IconEye, IconArrowUpRight, IconArrowDownRight } from '@tabler/icons-react';
+import { IconUsers, IconUserPlus, IconUserCheck, IconTrendingUp, IconEye, IconArrowUpRight, IconArrowDownRight, IconSchool, IconId } from '@tabler/icons-react';
 import { supabase, User } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 
 interface DashboardStats {
   totalUsers: number;
   totalAdmins: number;
-  totalRegularUsers: number;
+  totalStudents: number;
+  totalGroupA: number;
+  totalGroupB: number;
   recentUsers: User[];
   userGrowth: number;
 }
@@ -18,7 +20,9 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     totalAdmins: 0,
-    totalRegularUsers: 0,
+    totalStudents: 0,
+    totalGroupA: 0,
+    totalGroupB: 0,
     recentUsers: [],
     userGrowth: 0,
   });
@@ -32,13 +36,40 @@ export default function DashboardPage() {
   const fetchDashboardStats = async () => {
     try {
       // Get total users
-      const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true });
+      const { count: totalUsers } = await supabase
+        .from('User') // Updated ke tabel User
+        .select('*', { count: 'exact', head: true });
 
       // Get total admins
-      const { count: totalAdmins } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'admin');
+      const { count: totalAdmins } = await supabase
+        .from('User') // Updated ke tabel User
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'admin');
+
+      // Get total students
+      const { count: totalStudents } = await supabase
+        .from('User') // Updated ke tabel User
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'user');
+
+      // Get total Group A
+      const { count: totalGroupA } = await supabase
+        .from('User') // Updated ke tabel User
+        .select('*', { count: 'exact', head: true })
+        .eq('group', 'A');
+
+      // Get total Group B
+      const { count: totalGroupB } = await supabase
+        .from('User') // Updated ke tabel User
+        .select('*', { count: 'exact', head: true })
+        .eq('group', 'B');
 
       // Get recent users (last 5)
-      const { data: recentUsers } = await supabase.from('users').select('*').order('created_at', { ascending: false }).limit(5);
+      const { data: recentUsers } = await supabase
+        .from('User') // Updated ke tabel User
+        .select('*')
+        .order('createdAt', { ascending: false }) // Updated dari created_at ke createdAt
+        .limit(5);
 
       // Calculate growth (simple mock for now)
       const userGrowth = Math.floor(Math.random() * 20) + 5;
@@ -46,7 +77,9 @@ export default function DashboardPage() {
       setStats({
         totalUsers: totalUsers || 0,
         totalAdmins: totalAdmins || 0,
-        totalRegularUsers: (totalUsers || 0) - (totalAdmins || 0),
+        totalStudents: totalStudents || 0,
+        totalGroupA: totalGroupA || 0,
+        totalGroupB: totalGroupB || 0,
         recentUsers: recentUsers || [],
         userGrowth,
       });
@@ -75,11 +108,27 @@ export default function DashboardPage() {
       positive: true,
     },
     {
-      title: 'Pengguna Regular',
-      value: stats.totalRegularUsers,
-      icon: IconUserPlus,
+      title: 'Mahasiswa',
+      value: stats.totalStudents,
+      icon: IconSchool,
       color: 'green',
       growth: stats.userGrowth - 2,
+      positive: true,
+    },
+    {
+      title: 'Group A',
+      value: stats.totalGroupA,
+      icon: IconId,
+      color: 'teal',
+      growth: 5,
+      positive: true,
+    },
+    {
+      title: 'Group B',
+      value: stats.totalGroupB,
+      icon: IconId,
+      color: 'orange',
+      growth: 3,
       positive: true,
     },
     {
@@ -97,17 +146,17 @@ export default function DashboardPage() {
       <Group justify="space-between">
         <div>
           <Title order={2}>Dashboard MySRE</Title>
-          <Text c="gray.6">Selamat datang kembali, {user?.full_name}!</Text>
+          <Text c="gray.6">Selamat datang kembali, {user?.name}!</Text> {/* Updated dari full_name ke name */}
         </div>
         <Badge size="lg" variant="light" color="blue">
           {user?.role === 'admin' ? 'Administrator' : 'Pengguna'}
         </Badge>
       </Group>
 
-      {/* Stats Grid */}
-      <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
+      {/* Stats Cards */}
+      <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="lg">
         {statCards.map((stat, index) => (
-          <Card key={index} padding="lg" radius="md" withBorder>
+          <Card key={index} withBorder shadow="sm" radius="md" p="lg">
             <Group justify="space-between">
               <div>
                 <Text c="gray.6" size="sm" fw={500} tt="uppercase">
@@ -116,160 +165,114 @@ export default function DashboardPage() {
                 <Text fw={700} size="xl">
                   {stat.value}
                 </Text>
-                <Group gap="xs" mt={5}>
-                  {stat.positive ? <IconArrowUpRight size={16} color="var(--mantine-color-green-6)" /> : <IconArrowDownRight size={16} color="var(--mantine-color-red-6)" />}
-                  <Text size="sm" c={stat.positive ? 'green' : 'red'}>
-                    +{stat.growth}%
-                  </Text>
-                  <Text size="sm" c="gray.6">
-                    dari bulan lalu
-                  </Text>
-                </Group>
               </div>
               <ThemeIcon color={stat.color} variant="light" size="xl" radius="md">
-                <stat.icon size={24} />
+                <stat.icon size={28} />
               </ThemeIcon>
+            </Group>
+            <Group justify="space-between" mt="md">
+              <Text c="gray.6" size="sm">
+                {stat.positive ? 'Meningkat' : 'Menurun'}
+              </Text>
+              <Group gap={4}>
+                {stat.positive ? <IconArrowUpRight size={16} color="var(--mantine-color-green-6)" /> : <IconArrowDownRight size={16} color="var(--mantine-color-red-6)" />}
+                <Text c={stat.positive ? 'green' : 'red'} size="sm" fw={500}>
+                  {stat.growth}%
+                </Text>
+              </Group>
             </Group>
           </Card>
         ))}
       </SimpleGrid>
 
+      {/* Recent Users */}
       <Grid>
-        <Grid.Col span={{ base: 12, md: 8 }}>
-          <Card padding="lg" radius="md" withBorder>
-            <Title order={3} mb="md">
-              Pengguna Terbaru
-            </Title>
-            <Stack gap="sm">
-              {stats.recentUsers.map((user) => (
-                <Group
-                  key={user.id}
-                  justify="space-between"
-                  p="sm"
-                  style={{
-                    borderRadius: '8px',
-                    backgroundColor: 'var(--mantine-color-gray-0)',
-                  }}
-                >
-                  <Group gap="sm">
-                    <Avatar src={user.avatar_url} alt={user.full_name} size="md" color="blue">
-                      {user.full_name.charAt(0)}
+        <Grid.Col span={{ base: 12, lg: 8 }}>
+          <Card withBorder shadow="sm" radius="md" p="lg">
+            <Group justify="space-between" mb="md">
+              <Title order={4}>Pengguna Terbaru</Title>
+              <ActionIcon variant="subtle" color="gray">
+                <IconEye size={16} />
+              </ActionIcon>
+            </Group>
+            <Stack gap="md">
+              {stats.recentUsers.map((recentUser) => (
+                <Group key={recentUser.id} justify="space-between">
+                  <Group>
+                    <Avatar src={recentUser.avatar_url} alt={recentUser.name} size="sm" color="blue">
+                      {recentUser.name.charAt(0)} {/* Updated dari full_name ke name */}
                     </Avatar>
                     <div>
                       <Text size="sm" fw={500}>
-                        {user.full_name}
+                        {recentUser.name} {/* Updated dari full_name ke name */}
                       </Text>
                       <Text size="xs" c="gray.6">
-                        {user.email}
+                        {recentUser.email}
                       </Text>
                     </div>
                   </Group>
-                  <Group gap="sm">
-                    <Badge color={user.role === 'admin' ? 'red' : 'blue'} variant="light" size="sm">
-                      {user.role === 'admin' ? 'Admin' : 'User'}
+                  <Group gap="xs">
+                    <Badge color={recentUser.role === 'admin' ? 'red' : 'blue'} variant="light" size="sm">
+                      {recentUser.role === 'admin' ? 'Admin' : 'Mahasiswa'}
                     </Badge>
-                    <Text size="xs" c="gray.5">
-                      {new Date(user.created_at).toLocaleDateString('id-ID')}
-                    </Text>
+                    {recentUser.group && (
+                      <Badge color={recentUser.group === 'A' ? 'green' : 'orange'} variant="outline" size="sm">
+                        {recentUser.group}
+                      </Badge>
+                    )}
                   </Group>
                 </Group>
               ))}
-
-              {stats.recentUsers.length === 0 && !loading && (
-                <Text ta="center" c="gray.5" py="xl">
-                  Belum ada pengguna terdaftar
-                </Text>
-              )}
             </Stack>
           </Card>
         </Grid.Col>
 
-        <Grid.Col span={{ base: 12, md: 4 }}>
-          <Stack>
-            <Card padding="lg" radius="md" withBorder>
-              <Title order={4} mb="md">
-                Distribusi Pengguna
-              </Title>
-              <Center>
-                <RingProgress
-                  size={160}
-                  thickness={20}
-                  sections={[
-                    {
-                      value: stats.totalUsers > 0 ? (stats.totalAdmins / stats.totalUsers) * 100 : 0,
-                      color: 'red',
-                      tooltip: `${stats.totalAdmins} Administrator`,
-                    },
-                    {
-                      value: stats.totalUsers > 0 ? (stats.totalRegularUsers / stats.totalUsers) * 100 : 0,
-                      color: 'blue',
-                      tooltip: `${stats.totalRegularUsers} Pengguna Regular`,
-                    },
-                  ]}
-                  label={
-                    <Text ta="center" fw={700} size="lg">
-                      {stats.totalUsers}
-                    </Text>
-                  }
-                />
-              </Center>
-              <Stack gap="xs" mt="md">
-                <Group justify="space-between">
-                  <Group gap="xs">
-                    <Box w={12} h={12} bg="red.5" style={{ borderRadius: 2 }} />
-                    <Text size="sm">Administrator</Text>
-                  </Group>
+        <Grid.Col span={{ base: 12, lg: 4 }}>
+          <Card withBorder shadow="sm" radius="md" p="lg">
+            <Title order={4} mb="md">
+              Distribusi Group
+            </Title>
+            <Stack gap="lg">
+              <div>
+                <Group justify="space-between" mb="xs">
+                  <Text size="sm">Group A</Text>
                   <Text size="sm" fw={500}>
-                    {stats.totalAdmins}
+                    {stats.totalGroupA}
                   </Text>
                 </Group>
-                <Group justify="space-between">
-                  <Group gap="xs">
-                    <Box w={12} h={12} bg="blue.5" style={{ borderRadius: 2 }} />
-                    <Text size="sm">Pengguna Regular</Text>
-                  </Group>
+                <Progress value={(stats.totalGroupA / (stats.totalGroupA + stats.totalGroupB)) * 100} color="green" size="lg" />
+              </div>
+              <div>
+                <Group justify="space-between" mb="xs">
+                  <Text size="sm">Group B</Text>
                   <Text size="sm" fw={500}>
-                    {stats.totalRegularUsers}
+                    {stats.totalGroupB}
                   </Text>
                 </Group>
-              </Stack>
-            </Card>
+                <Progress value={(stats.totalGroupB / (stats.totalGroupA + stats.totalGroupB)) * 100} color="orange" size="lg" />
+              </div>
+            </Stack>
 
-            <Card padding="lg" radius="md" withBorder>
-              <Title order={4} mb="md">
-                Aktivitas Sistem
-              </Title>
-              <Stack gap="md">
-                <div>
-                  <Group justify="space-between" mb="xs">
-                    <Text size="sm">Login Rate</Text>
-                    <Text size="sm" fw={500}>
-                      87%
+            <Center mt="xl">
+              <RingProgress
+                size={120}
+                thickness={12}
+                sections={[
+                  { value: (stats.totalGroupA / (stats.totalGroupA + stats.totalGroupB)) * 100, color: 'green' },
+                  { value: (stats.totalGroupB / (stats.totalGroupA + stats.totalGroupB)) * 100, color: 'orange' },
+                ]}
+                label={
+                  <Text c="gray.6" fw={700} ta="center" size="xs">
+                    {stats.totalGroupA + stats.totalGroupB}
+                    <br />
+                    <Text span c="gray.5" size="xs">
+                      Mahasiswa
                     </Text>
-                  </Group>
-                  <Progress value={87} color="green" />
-                </div>
-                <div>
-                  <Group justify="space-between" mb="xs">
-                    <Text size="sm">Engagement</Text>
-                    <Text size="sm" fw={500}>
-                      73%
-                    </Text>
-                  </Group>
-                  <Progress value={73} color="blue" />
-                </div>
-                <div>
-                  <Group justify="space-between" mb="xs">
-                    <Text size="sm">Active Users</Text>
-                    <Text size="sm" fw={500}>
-                      92%
-                    </Text>
-                  </Group>
-                  <Progress value={92} color="violet" />
-                </div>
-              </Stack>
-            </Card>
-          </Stack>
+                  </Text>
+                }
+              />
+            </Center>
+          </Card>
         </Grid.Col>
       </Grid>
     </Stack>

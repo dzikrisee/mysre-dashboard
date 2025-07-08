@@ -1,4 +1,4 @@
-// src/lib/supabase.ts - Untuk tabel User baru dengan camelCase
+// src/lib/supabase.ts - Updated untuk tabel User baru
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -8,9 +8,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Types untuk tabel User baru
 export interface User {
-  id: string; // UUID sebagai string di TypeScript
+  id: string; // UUID sebagai string
   email: string;
-  name: string;
+  name: string; // Ganti dari full_name
   password?: string;
   role: 'admin' | 'user';
   createdAt: string; // camelCase sesuai database
@@ -21,9 +21,9 @@ export interface User {
 }
 
 export interface AuthUser {
-  id: string; // UUID sebagai string di TypeScript
+  id: string;
   email: string;
-  name: string;
+  name: string; // Ganti dari full_name
   role: 'admin' | 'user';
   avatar_url?: string;
   group?: 'A' | 'B';
@@ -48,7 +48,7 @@ export type Database = {
           avatar_url: string | null;
         };
         Insert: {
-          id?: string; // UUID opsional untuk insert (bisa auto-generate)
+          id?: string;
           email: string;
           name: string;
           password?: string | null;
@@ -94,6 +94,10 @@ export type UserGroup = Database['public']['Tables']['User']['Row']['group'];
 // Helper functions untuk query
 export const getUserByEmail = async (email: string) => {
   return await supabase.from('User').select('*').eq('email', email).single();
+};
+
+export const getUserByNim = async (nim: string) => {
+  return await supabase.from('User').select('*').eq('nim', nim).single();
 };
 
 export const getUsersByGroup = async (group: 'A' | 'B') => {

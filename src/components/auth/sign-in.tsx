@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Paper, TextInput, PasswordInput, Button, Title, Text, Container, Stack, Box, Alert, Group, ThemeIcon, Divider, Card, Badge } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { IconUser, IconLock, IconInfoCircle, IconShield, IconLogin } from '@tabler/icons-react';
+import { IconUser, IconLock, IconInfoCircle, IconShield, IconLogin, IconMail, IconId } from '@tabler/icons-react';
 import { useAuth } from '@/providers/auth-provider';
 
 export function SignIn() {
@@ -17,7 +17,7 @@ export function SignIn() {
       password: '',
     },
     validate: {
-      identifier: (value) => (value.length < 1 ? 'Email atau username harus diisi' : null),
+      identifier: (value) => (value.length < 1 ? 'Email atau NIM harus diisi' : null), // Updated dari username ke NIM
       password: (value) => (value.length < 6 ? 'Password minimal 6 karakter' : null),
     },
   });
@@ -34,6 +34,9 @@ export function SignIn() {
 
     setLoading(false);
   };
+
+  // Helper untuk mendeteksi apakah input adalah email atau NIM
+  const isEmailFormat = (input: string) => input.includes('@');
 
   return (
     <Container size={480} my={40}>
@@ -83,30 +86,17 @@ export function SignIn() {
           <Divider label="Masukkan kredensial Anda" labelPosition="center" color="gray.3" />
 
           {error && (
-            <Alert
-              icon={<IconInfoCircle size={18} />}
-              title="Gagal Masuk"
-              color="red"
-              variant="light"
-              radius="md"
-              styles={{
-                root: {
-                  border: '1px solid var(--mantine-color-red-3)',
-                  backgroundColor: 'var(--mantine-color-red-0)',
-                },
-              }}
-            >
+            <Alert icon={<IconInfoCircle size={16} />} title="Login Gagal" color="red" variant="light">
               {error}
             </Alert>
           )}
 
           <form onSubmit={form.onSubmit(handleSubmit)}>
-            <Stack gap="lg">
+            <Stack gap="md">
               <TextInput
-                required
-                label="Email atau Username"
-                placeholder="admin@mysre.com atau admin"
-                leftSection={<IconUser size={18} />}
+                label="Email atau NIM"
+                placeholder="admin@mysre.com atau 2021001001"
+                leftSection={isEmailFormat(form.values.identifier) ? <IconMail size={18} /> : <IconId size={18} />}
                 size="md"
                 radius="md"
                 styles={{
@@ -126,7 +116,6 @@ export function SignIn() {
               />
 
               <PasswordInput
-                required
                 label="Password"
                 placeholder="Masukkan password Anda"
                 leftSection={<IconLock size={18} />}
@@ -178,11 +167,26 @@ export function SignIn() {
 
           <Divider color="gray.2" />
 
+          {/* Login Info */}
+          <Box>
+            <Alert icon={<IconInfoCircle size={16} />} title="Informasi Login" color="blue" variant="light">
+              <Stack gap="xs">
+                <Text size="sm">
+                  • <strong>Administrator:</strong> Gunakan email admin
+                </Text>
+                <Text size="sm">
+                  • <strong>Mahasiswa:</strong> Gunakan NIM (hanya untuk testing)
+                </Text>
+                <Text size="sm" c="gray.6">
+                  Hanya administrator yang dapat mengakses dashboard ini.
+                </Text>
+              </Stack>
+            </Alert>
+          </Box>
+
           <Box ta="center">
             <Text size="xs" c="gray.4">
-              Hanya administrator yang memiliki akses ke dashboard ini.
-              <br />
-              Hubungi IT Support jika mengalami kendala.
+              Hubungi IT Support jika mengalami kendala login.
             </Text>
           </Box>
         </Stack>
@@ -190,7 +194,7 @@ export function SignIn() {
 
       {/* Footer Info */}
       <Box ta="center" mt="xl">
-        {/* <Group justify="center" gap="xs" mb="sm">
+        <Group justify="center" gap="xs" mb="sm">
           <Text size="xs" c="gray.4">
             Powered by
           </Text>
@@ -203,7 +207,7 @@ export function SignIn() {
           <Badge size="xs" variant="outline" color="gray">
             Mantine
           </Badge>
-        </Group> */}
+        </Group>
         <Text size="xs" c="gray.4">
           © 2025 MySRE. Platform Manajemen Naskah Akademik.
         </Text>

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Modal, TextInput, Select, Button, Stack, Group, PasswordInput, Avatar, FileInput, Text, Divider } from '@mantine/core';
+import { useState } from 'react';
+import { Modal, TextInput, Select, Button, Stack, Group, FileInput, Avatar, Box, Text, PasswordInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconUser, IconMail, IconLock, IconUpload, IconCheck, IconX } from '@tabler/icons-react';
+import { IconCheck, IconX, IconUpload } from '@tabler/icons-react';
 import { supabase, User } from '@/lib/supabase';
 
 interface UserFormProps {
@@ -13,30 +13,32 @@ interface UserFormProps {
 }
 
 interface FormValues {
-  full_name: string;
+  name: string; // Updated dari full_name ke name
   email: string;
-  role: 'admin' | 'user';
   password?: string;
+  role: 'admin' | 'user';
+  group?: 'A' | 'B' | '';
+  nim?: string;
   avatar?: File | null;
 }
 
 export function UserForm({ user, onClose }: UserFormProps) {
   const [loading, setLoading] = useState(false);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-
   const isEditing = !!user;
 
   const form = useForm<FormValues>({
     initialValues: {
-      full_name: user?.full_name || '',
+      name: user?.name || '', // Updated dari full_name ke name
       email: user?.email || '',
-      role: user?.role || 'user',
       password: '',
+      role: user?.role || 'user',
+      group: user?.group || '',
+      nim: user?.nim || '',
       avatar: null,
     },
     validate: {
-      full_name: (value) => (value.length < 2 ? 'Nama minimal 2 karakter' : null),
-      email: (value) => (/^\S+@\S+$/.test(value) ? null : 'Email tidak valid'),
+      name: (value) => (value.length < 2 ? 'Nama minimal 2 karakter' : null),
+      email: (value) => (/^\S+@\S+$/.test(value) ? null : 'Format email tidak valid'),
       password: (value) => {
         if (!isEditing && (!value || value.length < 6)) {
           return 'Password minimal 6 karakter';
@@ -46,28 +48,17 @@ export function UserForm({ user, onClose }: UserFormProps) {
         }
         return null;
       },
+      nim: (value) => {
+        // Validasi NIM hanya untuk role user
+        if (form.values.role === 'user' && value) {
+          if (!/^\d{10}$/.test(value)) {
+            return 'NIM harus 10 digit angka';
+          }
+        }
+        return null;
+      },
     },
   });
-
-  useEffect(() => {
-    if (user?.avatar_url) {
-      setAvatarPreview(user.avatar_url);
-    }
-  }, [user]);
-
-  const handleAvatarChange = (file: File | null) => {
-    form.setFieldValue('avatar', file);
-
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setAvatarPreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setAvatarPreview(user?.avatar_url || null);
-    }
-  };
 
   const uploadAvatar = async (file: File, userId: string): Promise<string | null> => {
     try {
@@ -116,12 +107,21 @@ export function UserForm({ user, onClose }: UserFormProps) {
     try {
       if (isEditing && user) {
         // Update existing user
-        const updateData: Partial<User> = {
-          full_name: values.full_name,
+        const updateData: any = {
+          name: values.name, // Updated dari full_name ke name
           email: values.email,
           role: values.role,
-          updated_at: new Date().toISOString(),
+          updatedAt: new Date().toISOString(), // Updated dari updated_at ke updatedAt
         };
+
+        // Tambah group dan nim hanya jika role adalah user
+        if (values.role === 'user') {
+          updateData.group = values.group || null;
+          updateData.nim = values.nim || null;
+        } else {
+          updateData.group = null;
+          updateData.nim = null;
+        }
 
         // Upload avatar if provided
         if (values.avatar) {
@@ -131,11 +131,14 @@ export function UserForm({ user, onClose }: UserFormProps) {
           }
         }
 
-        const { error } = await supabase.from('users').update(updateData).eq('id', user.id);
+        const { error } = await supabase
+          .from('User') // Updated ke tabel User
+          .update(updateData)
+          .eq('id', user.id);
 
         if (error) throw error;
 
-        // Update password if provided
+        // Update password if provided (via Supabase Auth)
         if (values.password) {
           const { error: authError } = await supabase.auth.admin.updateUserById(user.id, { password: values.password });
 
@@ -151,15 +154,13 @@ export function UserForm({ user, onClose }: UserFormProps) {
           icon: <IconCheck size={16} />,
         });
       } else {
-        // Create new user - Method alternatif tanpa admin API
-
-        // 1. Coba buat dengan signUp biasa dulu
+        // Create new user
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: values.email,
           password: values.password!,
           options: {
             data: {
-              full_name: values.full_name,
+              name: values.name, // Updated dari full_name ke name
             },
           },
         });
@@ -168,17 +169,7 @@ export function UserForm({ user, onClose }: UserFormProps) {
           throw new Error('Gagal membuat akun: ' + authError.message);
         }
 
-        // 2. Jika berhasil, langsung confirm user (via SQL function)
         if (authData.user) {
-          // Confirm user via SQL
-          const { error: confirmError } = await supabase.rpc('confirm_user', {
-            user_id: authData.user.id,
-          });
-
-          if (confirmError) {
-            console.log('Auto confirm failed, user perlu konfirmasi email');
-          }
-
           let avatarUrl = null;
 
           // Upload avatar if provided
@@ -190,15 +181,24 @@ export function UserForm({ user, onClose }: UserFormProps) {
             }
           }
 
-          // Insert ke tabel users
-          const { error: profileError } = await supabase.from('users').insert({
+          // Insert ke tabel User
+          const insertData: any = {
             id: authData.user.id,
             email: values.email,
-            full_name: values.full_name,
+            name: values.name, // Updated dari full_name ke name
             role: values.role,
             avatar_url: avatarUrl,
-            username: values.role === 'admin' ? values.email.split('@')[0] : null,
-          });
+          };
+
+          // Tambah group dan nim hanya jika role adalah user
+          if (values.role === 'user') {
+            insertData.group = values.group || null;
+            insertData.nim = values.nim || null;
+          }
+
+          const { error: profileError } = await supabase
+            .from('User') // Updated ke tabel User
+            .insert(insertData);
 
           if (profileError) {
             throw new Error('Gagal membuat profil: ' + profileError.message);
@@ -207,7 +207,7 @@ export function UserForm({ user, onClose }: UserFormProps) {
 
         notifications.show({
           title: 'Berhasil',
-          message: `${values.role === 'admin' ? 'Administrator' : 'Pengguna'} baru berhasil dibuat`,
+          message: `${values.role === 'admin' ? 'Administrator' : 'Mahasiswa'} baru berhasil dibuat`,
           color: 'green',
           icon: <IconCheck size={16} />,
         });
@@ -236,50 +236,59 @@ export function UserForm({ user, onClose }: UserFormProps) {
         </Text>
       }
       size="md"
-      centered
+      closeOnClickOutside={false}
     >
       <form onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
-          {/* Avatar Section */}
-          <Stack gap="xs" align="center">
-            <Avatar src={avatarPreview} alt={form.values.full_name} size="xl" color="blue">
-              {form.values.full_name.charAt(0)}
+          {/* Avatar Upload */}
+          <Box ta="center">
+            <Avatar src={user?.avatar_url} alt={form.values.name} size={80} mx="auto" mb="sm" color="blue">
+              {form.values.name.charAt(0)}
             </Avatar>
-            <FileInput placeholder="Upload foto profil" accept="image/*" leftSection={<IconUpload size={16} />} onChange={handleAvatarChange} clearable />
-          </Stack>
+            <FileInput placeholder="Pilih foto profil" leftSection={<IconUpload size={16} />} accept="image/*" {...form.getInputProps('avatar')} />
+          </Box>
 
-          <Divider />
+          {/* Basic Info */}
+          <TextInput label="Nama Lengkap" placeholder="Masukkan nama lengkap" required {...form.getInputProps('name')} />
 
-          {/* Form Fields */}
-          <TextInput required label="Nama Lengkap" placeholder="Masukkan nama lengkap" leftSection={<IconUser size={16} />} {...form.getInputProps('full_name')} />
+          <TextInput label="Email" placeholder="Masukkan email" required {...form.getInputProps('email')} />
 
-          <TextInput required label="Email" placeholder="nama@email.com" leftSection={<IconMail size={16} />} {...form.getInputProps('email')} />
+          <PasswordInput label="Password" placeholder={isEditing ? 'Kosongkan jika tidak ingin mengubah' : 'Masukkan password'} required={!isEditing} {...form.getInputProps('password')} />
 
           <Select
-            required
             label="Role"
             placeholder="Pilih role"
+            required
             data={[
-              { value: 'user', label: 'Pengguna' },
               { value: 'admin', label: 'Administrator' },
+              { value: 'user', label: 'Mahasiswa' },
             ]}
             {...form.getInputProps('role')}
           />
 
-          <PasswordInput
-            required={!isEditing}
-            label={isEditing ? 'Password Baru (Opsional)' : 'Password'}
-            placeholder={isEditing ? 'Kosongkan jika tidak ingin mengubah' : 'Masukkan password'}
-            leftSection={<IconLock size={16} />}
-            {...form.getInputProps('password')}
-          />
+          {/* Fields khusus untuk mahasiswa */}
+          {form.values.role === 'user' && (
+            <>
+              <Select
+                label="Group"
+                placeholder="Pilih group"
+                data={[
+                  { value: 'A', label: 'Group A' },
+                  { value: 'B', label: 'Group B' },
+                ]}
+                {...form.getInputProps('group')}
+              />
+
+              <TextInput label="NIM" placeholder="Masukkan NIM (10 digit)" {...form.getInputProps('nim')} />
+            </>
+          )}
 
           <Group justify="flex-end" mt="md">
-            <Button variant="light" onClick={onClose}>
+            <Button variant="subtle" onClick={onClose}>
               Batal
             </Button>
             <Button type="submit" loading={loading}>
-              {isEditing ? 'Perbarui' : 'Tambah'}
+              {isEditing ? 'Simpan Perubahan' : 'Buat Pengguna'}
             </Button>
           </Group>
         </Stack>
