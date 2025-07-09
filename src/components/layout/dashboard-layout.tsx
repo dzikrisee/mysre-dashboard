@@ -1,9 +1,10 @@
+// src/components/layout/dashboard-layout.tsx - Updated dengan tab List PDF
 'use client';
 
 import { useState } from 'react';
 import { AppShell, Text, UnstyledButton, Group, Avatar, Box, Burger, ScrollArea, Menu, Title, Badge, Divider, Stack, ActionIcon, Tooltip } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconUsers, IconCategory, IconLogout, IconUser, IconSettings, IconChevronRight, IconDashboard, IconBell } from '@tabler/icons-react';
+import { IconUsers, IconFileText, IconLogout, IconUser, IconSettings, IconChevronRight, IconDashboard, IconBell } from '@tabler/icons-react';
 import { useAuth } from '@/providers/auth-provider';
 import { useRouter, usePathname } from 'next/navigation';
 
@@ -72,9 +73,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       href: '/dashboard/users',
     },
     {
-      icon: <IconCategory size={20} />,
-      label: 'Kategori',
-      href: '/dashboard/categories',
+      icon: <IconFileText size={20} />, // Ganti dari IconCategory ke IconFileText
+      label: 'List Artikel', // Ganti dari 'Kategori' ke 'List PDF'
+      href: '/dashboard/articles', // Ganti href ke /articles
     },
   ];
 
@@ -118,12 +119,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <Menu.Target>
                 <UnstyledButton>
                   <Group gap="sm">
-                    <Avatar src={user?.avatar_url} alt={user?.full_name} size="sm" color="blue">
-                      {user?.full_name?.charAt(0)}
+                    <Avatar src={user?.avatar_url} alt={user?.name} size="sm" color="blue">
+                      {user?.name?.charAt(0)}
                     </Avatar>
                     <Stack gap={0}>
                       <Text size="sm" fw={500}>
-                        {user?.full_name}
+                        {user?.name}
                       </Text>
                       <Text size="xs" c="gray.6">
                         {user?.role === 'admin' ? 'Administrator' : 'Pengguna'}
@@ -178,12 +179,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             }}
           >
             <Group gap="sm">
-              <Avatar src={user?.avatar_url} alt={user?.full_name} size="sm" color="blue">
-                {user?.full_name?.charAt(0)}
+              <Avatar src={user?.avatar_url} alt={user?.name} size="sm" color="blue">
+                {user?.name?.charAt(0)}
               </Avatar>
               <Stack gap={0} style={{ flex: 1 }}>
                 <Text size="sm" fw={500} truncate>
-                  {user?.full_name}
+                  {user?.name}
                 </Text>
                 <Badge size="xs" variant="light" color={user?.role === 'admin' ? 'red' : 'blue'}>
                   {user?.role === 'admin' ? 'Admin' : 'User'}
