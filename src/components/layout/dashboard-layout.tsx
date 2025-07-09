@@ -1,10 +1,10 @@
-// src/components/layout/dashboard-layout.tsx - Updated dengan tab List PDF
+// src/components/layout/dashboard-layout.tsx - Updated dengan Project Writer tab
 'use client';
 
 import { useState } from 'react';
-import { AppShell, Text, UnstyledButton, Group, Avatar, Box, Burger, ScrollArea, Menu, Title, Badge, Divider, Stack, ActionIcon, Tooltip } from '@mantine/core';
+import { AppShell, Text, UnstyledButton, Group, Avatar, Box, Burger, ScrollArea, Menu, Title, Badge, Divider, Stack, ActionIcon, Tooltip, Image } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconUsers, IconFileText, IconLogout, IconUser, IconSettings, IconChevronRight, IconDashboard, IconBell } from '@tabler/icons-react';
+import { IconUsers, IconFileText, IconLogout, IconUser, IconSettings, IconChevronRight, IconDashboard, IconBell, IconEdit, IconPencil, IconBulb } from '@tabler/icons-react';
 import { useAuth } from '@/providers/auth-provider';
 import { useRouter, usePathname } from 'next/navigation';
 
@@ -73,9 +73,19 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       href: '/dashboard/users',
     },
     {
-      icon: <IconFileText size={20} />, // Ganti dari IconCategory ke IconFileText
-      label: 'List Artikel', // Ganti dari 'Kategori' ke 'List PDF'
-      href: '/dashboard/articles', // Ganti href ke /articles
+      icon: <IconFileText size={20} />,
+      label: 'List Artikel',
+      href: '/dashboard/articles',
+    },
+    {
+      icon: <IconPencil size={20} />,
+      label: 'Project Writer',
+      href: '/dashboard/project-writer',
+    },
+    {
+      icon: <IconBulb size={20} />,
+      label: 'Project Brainstorm',
+      href: '/dashboard/project-brainstorm',
     },
   ];
 
@@ -98,13 +108,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <Group h="100%" px="md" justify="space-between">
           <Group>
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-            <Group gap="sm">
-              <Title order={3} c="blue.6">
-                MySRE
-              </Title>
-              <Badge variant="light" size="sm">
-                Dashboard
-              </Badge>
+            <Group gap="sm" style={{ display: 'flex', alignItems: 'center' }}>
+              {/* Logo MySRE */}
+              <Image src="/LogoSRE_Fix.png" alt="MySRE Logo" height={45} width="auto" fit="contain" fallbackSrc="/logo-mysre-fallback.png" />
             </Group>
           </Group>
 
@@ -135,9 +141,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </Menu.Target>
 
               <Menu.Dropdown>
-                <Menu.Item leftSection={<IconUser size={16} />}>Profil</Menu.Item>
+                <Menu.Label>Akun</Menu.Label>
+                <Menu.Item leftSection={<IconUser size={16} />} onClick={() => router.push('/dashboard/profile')}>
+                  Profil Saya
+                </Menu.Item>
                 <Menu.Item leftSection={<IconSettings size={16} />}>Pengaturan</Menu.Item>
+
                 <Menu.Divider />
+
                 <Menu.Item leftSection={<IconLogout size={16} />} color="red" onClick={handleLogout}>
                   Keluar
                 </Menu.Item>
@@ -155,7 +166,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </Text>
 
             {navLinks.map((link) => (
-              <NavLink key={link.href} icon={link.icon} label={link.label} href={link.href} active={pathname === link.href} onClick={close} />
+              <NavLink key={link.href} {...link} active={pathname === link.href} onClick={close} />
             ))}
 
             <Divider my="sm" />
