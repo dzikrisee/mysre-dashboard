@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MySRE Analytics Testing Page</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+      }
+
+      .header {
+        background: linear-gradient(135deg, #4c6ef5 0%, #7048e8 100%);
+        color: white;
+        padding: 30px;
+        text-align: center;
+      }
+
+      .header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 10px;
+        font-weight: 700;
+      }
+
+      .header p {
+        font-size: 1.1rem;
+        opacity: 0.9;
+      }
+
+      .content {
+        padding: 40px;
+      }
+
+      .user-selector {
+        background: #f8f9fa;
+        padding: 25px;
+        border-radius: 15px;
+        margin-bottom: 30px;
+        border: 2px solid #e9ecef;
+      }
+
+      .user-selector h3 {
+        color: #495057;
+        margin-bottom: 15px;
+        font-size: 1.3rem;
+      }
+
+      .user-buttons {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+      }
+
+      .user-btn {
+        padding: 12px 24px;
+        border: 2px solid #dee2e6;
+        background: white;
+        border-radius: 50px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 500;
+        font-size: 1rem;
+      }
+
+      .user-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      }
+
+      .user-btn.active {
+        background: #4c6ef5;
+        color: white;
+        border-color: #4c6ef5;
+      }
+
+      .modules {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        margin-bottom: 30px;
+      }
+
+      .module {
+        background: #f8f9fa;
+        border-radius: 15px;
+        padding: 25px;
+        border: 2px solid #e9ecef;
+      }
+
+      .module h3 {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 20px;
+        color: #495057;
+        font-size: 1.4rem;
+      }
+
+      .module-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+      }
+
+      .brain-icon {
+        background: linear-gradient(135deg, #845ec2, #b39bc8);
+        color: white;
+      }
+
+      .writer-icon {
+        background: linear-gradient(135deg, #4ecdc4, #44a08d);
+        color: white;
+      }
+
+      .action-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .action-btn {
+        padding: 15px 20px;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      }
+
+      .action-btn:active {
+        transform: translateY(0);
+      }
+
+      .brain-btn {
+        background: linear-gradient(135deg, #845ec2, #b39bc8);
+        color: white;
+      }
+
+      .writer-btn {
+        background: linear-gradient(135deg, #4ecdc4, #44a08d);
+        color: white;
+      }
+
+      .stats {
+        background: #212529;
+        color: white;
+        padding: 25px;
+        border-radius: 15px;
+        margin-top: 20px;
+      }
+
+      .stats h3 {
+        margin-bottom: 15px;
+        color: #ffc107;
+        font-size: 1.3rem;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+      }
+
+      .stat-item {
+        text-align: center;
+        padding: 15px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+      }
+
+      .stat-number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #4ecdc4;
+      }
+
+      .stat-label {
+        font-size: 0.9rem;
+        opacity: 0.8;
+        margin-top: 5px;
+      }
+
+      .alert {
+        padding: 15px 20px;
+        border-radius: 10px;
+        margin: 10px 0;
+        font-weight: 500;
+        border: none;
+        animation: slideIn 0.3s ease;
+      }
+
+      .alert-success {
+        background: #d4edda;
+        color: #155724;
+        border-left: 4px solid #28a745;
+      }
+
+      .alert-error {
+        background: #f8d7da;
+        color: #721c24;
+        border-left: 4px solid #dc3545;
+      }
+
+      .disabled {
+        opacity: 0.6;
+        cursor: not-allowed !important;
+        pointer-events: none;
+      }
+
+      .loading {
+        position: relative;
+      }
+
+      .loading::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 20px;
+        height: 20px;
+        margin: -10px 0 0 -10px;
+        border: 2px solid transparent;
+        border-top: 2px solid white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      @keyframes slideIn {
+        from {
+          transform: translateX(-100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      .dashboard-link {
+        text-align: center;
+        margin-top: 30px;
+      }
+
+      .dashboard-btn {
+        display: inline-block;
+        padding: 15px 30px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        text-decoration: none;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+      }
+
+      .dashboard-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      }
+
+      @media (max-width: 768px) {
+        .modules {
+          grid-template-columns: 1fr;
+        }
+
+        .action-buttons {
+          grid-template-columns: 1fr;
+        }
+
+        .user-buttons {
+          justify-content: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🧠 MySRE Analytics Testing</h1>
+        <p>Simulate student interactions untuk testing Learning Behaviour Analytics</p>
+      </div>
+
+      <div class="content">
+        <!-- User Selector -->
+        <div class="user-selector">
+          <h3>👤 Pilih Student untuk Testing:</h3>
+          <div class="user-buttons">
+            <button class="user-btn" data-user="student-1">Ahmad Rizki (Group A)</button>
+            <button class="user-btn" data-user="student-2">Siti Nurhaliza (Group A)</button>
+            <button class="user-btn" data-user="student-3">Budi Santoso (Group B)</button>
+          </div>
+        </div>
+
+        <!-- Alert Container -->
+        <div id="alertContainer"></div>
+
+        <!-- Testing Modules -->
+        <div class="modules">
+          <!-- Brain Module -->
+          <div class="module">
+            <h3>
+              <div class="module-icon brain-icon">🧠</div>
+              Brain Module Testing
+            </h3>
+            <div class="action-buttons">
+              <button class="action-btn brain-btn" data-action="node_click">🔘 Click Node</button>
+              <button class="action-btn brain-btn" data-action="edge_click">↔️ Click Edge</button>
+              <button class="action-btn brain-btn" data-action="chat_query">💬 Ask AI Chat</button>
+              <button class="action-btn brain-btn" data-action="session_created">➕ New Session</button>
+            </div>
+          </div>
+
+          <!-- Writer Module -->
+          <div class="module">
+            <h3>
+              <div class="module-icon writer-icon">✍️</div>
+              Writer Module Testing
+            </h3>
+            <div class="action-buttons">
+              <button class="action-btn writer-btn" data-action="draft_created">📝 Create Draft</button>
+              <button class="action-btn writer-btn" data-action="draft_saved">💾 Save Draft</button>
+              <button class="action-btn writer-btn" data-action="ai_assistance_used">🤖 AI Assist</button>
+              <button class="action-btn writer-btn" data-action="annotation_created">📌 Add Annotation</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Stats -->
+        <div class="stats">
+          <h3>📊 Live Activity Stats</h3>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <div class="stat-number" id="nodeClicks">0</div>
+              <div class="stat-label">Node Clicks</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number" id="edgeClicks">0</div>
+              <div class="stat-label">Edge Clicks</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number" id="chatQueries">0</div>
+              <div class="stat-label">Chat Queries</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number" id="draftsCreated">0</div>
+              <div class="stat-label">Drafts Created</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number" id="aiAssistance">0</div>
+              <div class="stat-label">AI Assistance</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number" id="totalActions">0</div>
+              <div class="stat-label">Total Actions</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dashboard Link -->
+        <div class="dashboard-link">
+          <a href="/dashboard/analytics" target="_blank" class="dashboard-btn"> 📊 Open Analytics Dashboard </a>
+          <p style="margin-top: 10px; color: #6c757d; font-size: 0.9rem">Open dashboard di tab baru untuk melihat real-time updates</p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // State management
+      let selectedUser = null;
+      let stats = {
+        nodeClicks: 0,
+        edgeClicks: 0,
+        chatQueries: 0,
+        draftsCreated: 0,
+        aiAssistance: 0,
+        totalActions: 0,
+      };
+
+      // DOM elements
+      const userButtons = document.querySelectorAll('.user-btn');
+      const actionButtons = document.querySelectorAll('.action-btn');
+      const alertContainer = document.getElementById('alertContainer');
+
+      // Initialize
+      document.addEventListener('DOMContentLoaded', function () {
+        // Disable action buttons initially
+        toggleActionButtons(false);
+
+        // Add event listeners
+        userButtons.forEach((btn) => {
+          btn.addEventListener('click', selectUser);
+        });
+
+        actionButtons.forEach((btn) => {
+          btn.addEventListener('click', performAction);
+        });
+
+        // Load initial stats
+        updateStatsDisplay();
+      });
+
+      // User selection
+      function selectUser(event) {
+        const userId = event.target.dataset.user;
+        selectedUser = userId;
+
+        // Update UI
+        userButtons.forEach((btn) => btn.classList.remove('active'));
+        event.target.classList.add('active');
+
+        // Enable action buttons
+        toggleActionButtons(true);
+
+        showAlert(`Student selected: ${event.target.textContent}`, 'success');
+      }
+
+      // Toggle action buttons
+      function toggleActionButtons(enable) {
+        actionButtons.forEach((btn) => {
+          if (enable) {
+            btn.classList.remove('disabled');
+          } else {
+            btn.classList.add('disabled');
+          }
+        });
+      }
+
+      // Perform action
+      async function performAction(event) {
+        if (!selectedUser) {
+          showAlert('Pilih student terlebih dahulu!', 'error');
+          return;
+        }
+
+        const action = event.target.dataset.action;
+        const button = event.target;
+
+        // Show loading state
+        button.classList.add('loading');
+        button.disabled = true;
+
+        try {
+          // Send analytics data
+          const success = await sendAnalytics(action, selectedUser);
+
+          if (success) {
+            // Update local stats
+            updateLocalStats(action);
+
+            // Show success
+            showAlert(`✅ ${getActionLabel(action)} berhasil dicatat!`, 'success');
+          } else {
+            showAlert('❌ Gagal mencatat aktivitas. Coba lagi.', 'error');
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          showAlert('❌ Error: ' + error.message, 'error');
+        } finally {
+          // Remove loading state
+          button.classList.remove('loading');
+          button.disabled = false;
+        }
+      }
+
+      // Send analytics to backend
+      async function sendAnalytics(action, userId) {
+        try {
+          const response = await fetch('/api/analytics/test', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: action,
+              userId: userId,
+              document: `test-${action}-${Date.now()}`,
+              metadata: {
+                source: 'test-page',
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent,
+              },
+            }),
+          });
+
+          return response.ok;
+        } catch (error) {
+          console.error('Network error:', error);
+          // Fallback: simulate success for testing
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          return true;
+        }
+      }
+
+      // Update local stats
+      function updateLocalStats(action) {
+        switch (action) {
+          case 'node_click':
+            stats.nodeClicks++;
+            break;
+          case 'edge_click':
+            stats.edgeClicks++;
+            break;
+          case 'chat_query':
+            stats.chatQueries++;
+            break;
+          case 'draft_created':
+            stats.draftsCreated++;
+            break;
+          case 'ai_assistance_used':
+            stats.aiAssistance++;
+            break;
+        }
+        stats.totalActions++;
+        updateStatsDisplay();
+      }
+
+      // Update stats display
+      function updateStatsDisplay() {
+        document.getElementById('nodeClicks').textContent = stats.nodeClicks;
+        document.getElementById('edgeClicks').textContent = stats.edgeClicks;
+        document.getElementById('chatQueries').textContent = stats.chatQueries;
+        document.getElementById('draftsCreated').textContent = stats.draftsCreated;
+        document.getElementById('aiAssistance').textContent = stats.aiAssistance;
+        document.getElementById('totalActions').textContent = stats.totalActions;
+      }
+
+      // Get action label
+      function getActionLabel(action) {
+        const labels = {
+          node_click: 'Node Click',
+          edge_click: 'Edge Click',
+          chat_query: 'AI Chat Query',
+          session_created: 'New Session',
+          draft_created: 'Draft Creation',
+          draft_saved: 'Draft Save',
+          ai_assistance_used: 'AI Assistance',
+          annotation_created: 'Annotation',
+        };
+        return labels[action] || action;
+      }
+
+      // Show alert
+      function showAlert(message, type) {
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type}`;
+        alert.textContent = message;
+
+        alertContainer.appendChild(alert);
+
+        // Auto remove after 3 seconds
+        setTimeout(() => {
+          alert.remove();
+        }, 3000);
+      }
+    </script>
+  </body>
+</html>

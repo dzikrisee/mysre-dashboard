@@ -1,10 +1,9 @@
-// src/components/layout/dashboard-layout.tsx - Updated dengan Project Writer tab
 'use client';
 
 import { useState } from 'react';
 import { AppShell, Text, UnstyledButton, Group, Avatar, Box, Burger, ScrollArea, Menu, Title, Badge, Divider, Stack, ActionIcon, Tooltip, Image } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconUsers, IconFileText, IconLogout, IconUser, IconSettings, IconChevronRight, IconDashboard, IconBell, IconEdit, IconPencil, IconBulb } from '@tabler/icons-react';
+import { IconUsers, IconFileText, IconLogout, IconUser, IconSettings, IconChevronRight, IconDashboard, IconBell, IconPencil, IconBulb, IconChartLine, IconReportAnalytics } from '@tabler/icons-react';
 import { useAuth } from '@/providers/auth-provider';
 import { useRouter, usePathname } from 'next/navigation';
 
@@ -87,6 +86,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       label: 'Project Brainstorm',
       href: '/dashboard/project-brainstorm',
     },
+    {
+      icon: <IconReportAnalytics size={20} />,
+      label: 'Learning Analytics',
+      href: '/dashboard/analytics',
+    },
   ];
 
   const handleLogout = async () => {
@@ -109,7 +113,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <Group>
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
             <Group gap="sm" style={{ display: 'flex', alignItems: 'center' }}>
-              {/* Logo MySRE */}
               <Image src="/LogoSRE_Fix.png" alt="MySRE Logo" height={45} width="auto" fit="contain" fallbackSrc="/logo-mysre-fallback.png" />
             </Group>
           </Group>
@@ -133,7 +136,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         {user?.name}
                       </Text>
                       <Text size="xs" c="gray.6">
-                        {user?.role === 'admin' ? 'Administrator' : 'Pengguna'}
+                        {user?.role === 'ADMIN' ? 'Administrator' : 'Pengguna'}
                       </Text>
                     </Stack>
                   </Group>
@@ -197,8 +200,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <Text size="sm" fw={500} truncate>
                   {user?.name}
                 </Text>
-                <Badge size="xs" variant="light" color={user?.role === 'admin' ? 'red' : 'blue'}>
-                  {user?.role === 'admin' ? 'Admin' : 'User'}
+                <Badge size="xs" variant="light" color={user?.role === 'ADMIN' ? 'red' : 'blue'}>
+                  {user?.role === 'ADMIN' ? 'Admin' : 'User'}
                 </Badge>
               </Stack>
             </Group>

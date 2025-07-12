@@ -41,8 +41,8 @@ export function UserTable({ onUserSelect }: UserTableProps) {
       .order('createdAt', { ascending: false }); // Updated dari created_at ke createdAt
 
     // Filter berdasarkan tab aktif
-    if (activeTab === 'admin') {
-      query = query.eq('role', 'admin');
+    if (activeTab === 'ADMIN') {
+      query = query.eq('role', 'ADMIN');
     } else if (activeTab === 'students') {
       query = query.eq('role', 'user');
     } else if (activeTab === 'group-a') {
@@ -151,7 +151,7 @@ export function UserTable({ onUserSelect }: UserTableProps) {
             <Tabs.Tab value="all" leftSection={<IconUsers size={16} />}>
               Semua ({total})
             </Tabs.Tab>
-            <Tabs.Tab value="admin" leftSection={<IconUserCheck size={16} />}>
+            <Tabs.Tab value="ADMIN" leftSection={<IconUserCheck size={16} />}>
               Administrator
             </Tabs.Tab>
             <Tabs.Tab value="students" leftSection={<IconSchool size={16} />}>
@@ -175,7 +175,7 @@ export function UserTable({ onUserSelect }: UserTableProps) {
               leftSection={<IconFilter size={16} />}
               data={[
                 { value: '', label: 'Semua Role' },
-                { value: 'admin', label: 'Administrator' },
+                { value: 'ADMIN', label: 'Administrator' },
                 { value: 'user', label: 'Mahasiswa' },
               ]}
               value={roleFilter}
@@ -241,8 +241,8 @@ export function UserTable({ onUserSelect }: UserTableProps) {
                       </Text>
                     </Table.Td>
                     <Table.Td>
-                      <Badge color={user.role === 'admin' ? 'red' : 'blue'} variant="light" leftSection={user.role === 'admin' ? <IconUserCheck size={12} /> : <IconUserX size={12} />}>
-                        {user.role === 'admin' ? 'Administrator' : 'Mahasiswa'}
+                      <Badge color={user.role === 'ADMIN' ? 'red' : 'blue'} variant="light" leftSection={user.role === 'ADMIN' ? <IconUserCheck size={12} /> : <IconUserX size={12} />}>
+                        {user.role === 'ADMIN' ? 'Administrator' : 'Mahasiswa'}
                       </Badge>
                     </Table.Td>
                     <Table.Td>
@@ -294,7 +294,7 @@ export function UserTable({ onUserSelect }: UserTableProps) {
           {users.length === 0 && !loading && (
             <Box p="xl" ta="center">
               <Text c="gray.5">
-                {activeTab === 'all' ? 'Tidak ada data pengguna' : `Tidak ada data untuk ${activeTab === 'admin' ? 'administrator' : activeTab === 'students' ? 'mahasiswa' : activeTab === 'group-a' ? 'Group A' : 'Group B'}`}
+                {activeTab === 'all' ? 'Tidak ada data pengguna' : `Tidak ada data untuk ${activeTab === 'ADMIN' ? 'administrator' : activeTab === 'students' ? 'mahasiswa' : activeTab === 'group-a' ? 'Group A' : 'Group B'}`}
               </Text>
             </Box>
           )}
@@ -311,7 +311,7 @@ export function UserTable({ onUserSelect }: UserTableProps) {
         <Group justify="space-between" mt="md">
           <Text size="sm" c="gray.6">
             Menampilkan {users.length} dari {total} pengguna
-            {activeTab !== 'all' && <> • Filter: {activeTab === 'admin' ? 'Administrator' : activeTab === 'students' ? 'Mahasiswa' : activeTab === 'group-a' ? 'Group A' : 'Group B'}</>}
+            {activeTab !== 'all' && <> • Filter: {activeTab === 'ADMIN' ? 'Administrator' : activeTab === 'students' ? 'Mahasiswa' : activeTab === 'group-a' ? 'Group A' : 'Group B'}</>}
           </Text>
         </Group>
       </Card>

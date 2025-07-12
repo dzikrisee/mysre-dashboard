@@ -1,3 +1,7 @@
+// =====================================
+// 1. Updated Auth Provider (src/providers/auth-provider.tsx)
+// =====================================
+
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
@@ -23,7 +27,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    // Get initial session
     const getSession = async () => {
       const {
         data: { session },
@@ -37,23 +40,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     getSession();
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         await fetchUserProfile(session.user.id);
-        // Auto redirect ke dashboard setelah login (hanya admin)
-        const { data: userData } = await supabase
-          .from('User') // Updated ke tabel User
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
 
-        if (userData?.role === 'admin') {
+        // Record login analytics
+        await recordLoginAnalytics(session.user.id);
+
+        const { data: userData } = await supabase.from('User').select('role').eq('id', session.user.id).single();
+
+        if (userData?.role === 'ADMIN') {
+          // Updated ke ADMIN
           router.push('/dashboard');
         } else {
           await supabase.auth.signOut();
+          notifications.show({
+            title: 'Akses Ditolak',
+            message: 'Hanya administrator yang dapat mengakses dashboard',
+            color: 'red',
+            icon: <IconX size={16} />,
+          });
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
@@ -64,18 +72,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  const recordLoginAnalytics = async (userId: string) => {
+    try {
+      await supabase.from('analytics').insert({
+        action: 'login',
+        userId,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+          platform: navigator.platform,
+        },
+      });
+    } catch (error) {
+      console.error('Failed to record login analytics:', error);
+    }
+  };
+
   const fetchUserProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('User') // Updated ke tabel User
-      .select('*')
-      .eq('id', userId)
-      .single();
+    const { data, error } = await supabase.from('User').select('*').eq('id', userId).single();
 
     if (data && !error) {
       setUser({
         id: data.id,
         email: data.email,
-        name: data.name, // Updated dari full_name ke name
+        name: data.name,
         role: data.role,
         avatar_url: data.avatar_url,
         group: data.group,
@@ -90,16 +110,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Jika identifier bukan email, cari email berdasarkan NIM
       if (!identifier.includes('@')) {
-        const { data: userData, error: userError } = await supabase
-          .from('User') // Updated ke tabel User
-          .select('email')
-          .eq('nim', identifier) // Updated dari username ke nim
-          .single();
+        const { data: userData, error: userError } = await supabase.from('User').select('email').eq('nim', identifier).single();
 
         if (userError || !userData) {
           notifications.show({
             title: 'Error',
-            message: 'NIM tidak ditemukan', // Updated pesan error
+            message: 'NIM tidak ditemukan',
             color: 'red',
             icon: <IconX size={16} />,
           });
@@ -117,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         notifications.show({
           title: 'Error',
-          message: 'Email/NIM atau password salah', // Updated pesan error
+          message: 'Email/NIM atau password salah',
           color: 'red',
           icon: <IconX size={16} />,
         });
@@ -125,15 +141,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (data.user) {
-        // Cek apakah user adalah admin
-        const { data: userData, error: userError } = await supabase
-          .from('User') // Updated ke tabel User
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
+        const { data: userData, error: userError } = await supabase.from('User').select('*').eq('id', data.user.id).single();
 
-        if (userError || !userData || userData.role !== 'admin') {
-          // Logout user yang bukan admin
+        if (userError || !userData || userData.role !== 'ADMIN') {
+          // Updated ke ADMIN
           await supabase.auth.signOut();
           notifications.show({
             title: 'Akses Ditolak',
@@ -146,12 +157,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         notifications.show({
           title: 'Berhasil',
-          message: `Selamat datang, ${userData.name}!`, // Updated dari full_name ke name
+          message: `Selamat datang, ${userData.name}!`,
           color: 'green',
           icon: <IconCheck size={16} />,
         });
 
-        // Redirect ke dashboard setelah login berhasil
         setTimeout(() => {
           router.push('/dashboard');
         }, 1000);
@@ -170,86 +180,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, fullName: string) => {
-    try {
-      // 1. Daftar user di Auth
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name: fullName, // Updated dari full_name ke name
-          },
-        },
-      });
-
-      if (error) {
-        notifications.show({
-          title: 'Error',
-          message: error.message,
-          color: 'red',
-          icon: <IconX size={16} />,
-        });
-        return { success: false, error: error.message };
-      }
-
-      // 2. Jika berhasil dan ada user, insert ke tabel User
-      if (data.user && !data.user.email_confirmed_at) {
-        // User perlu konfirmasi email dulu
-        notifications.show({
-          title: 'Berhasil',
-          message: 'Silakan cek email untuk verifikasi akun.',
-          color: 'blue',
-          icon: <IconCheck size={16} />,
-        });
-        return { success: true };
-      }
-
-      // 3. Jika user langsung aktif, insert profil
-      if (data.user && data.user.email_confirmed_at) {
-        const { error: profileError } = await supabase
-          .from('User') // Updated ke tabel User
-          .insert({
-            id: data.user.id,
-            email: data.user.email!,
-            name: fullName, // Updated dari full_name ke name
-            role: 'user',
-          });
-
-        if (profileError) {
-          console.error('Profile insert error:', profileError);
-          // Jangan throw error, karena user auth sudah berhasil
-        }
-      }
-
-      notifications.show({
-        title: 'Berhasil',
-        message: 'Akun berhasil dibuat. Silakan cek email untuk verifikasi.',
-        color: 'green',
-        icon: <IconCheck size={16} />,
-      });
-
-      return { success: true };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Terjadi kesalahan';
-      notifications.show({
-        title: 'Error',
-        message,
-        color: 'red',
-        icon: <IconX size={16} />,
-      });
-      return { success: false, error: message };
-    }
-  };
-
   const signOut = async () => {
+    // Record logout analytics
+    if (user) {
+      try {
+        await supabase.from('analytics').insert({
+          action: 'logout',
+          userId: user.id,
+          metadata: { timestamp: new Date().toISOString() },
+        });
+      } catch (error) {
+        console.error('Failed to record logout analytics:', error);
+      }
+    }
+
     await supabase.auth.signOut();
     setUser(null);
     router.push('/auth');
   };
 
   const isAdmin = () => {
-    return user?.role === 'admin';
+    return user?.role === 'ADMIN'; // Updated ke ADMIN
   };
 
   if (loading) {
@@ -266,3 +217,88 @@ export function useAuth() {
   }
   return context;
 }
+
+
+
+// =====================================
+// 3. Detailed User Analytics Component
+// =====================================
+
+
+
+// =====================================
+// 4. Updated Dashboard Layout Navigation (src/components/layout/dashboard-layout.tsx)
+// =====================================
+
+
+
+
+
+// =====================================
+// 7. Example Usage dalam komponen Brain Module
+// =====================================
+
+// Di dalam komponen Node onClick handler:
+/*
+const handleNodeClick = (node: Node) => {
+  // Existing logic...
+  
+  // Track analytics
+  if (user?.id) {
+    AnalyticsTracker.trackNodeClick(user.id, node.id, node.type, node.articleId);
+  }
+};
+
+const handleEdgeClick = (edge: Edge) => {
+  // Existing logic...
+  
+  // Track analytics
+  if (user?.id) {
+    AnalyticsTracker.trackEdgeClick(user.id, edge.id, edge.relation || 'unknown', edge.articleId);
+  }
+};
+
+const handleChatSubmit = async (query: string) => {
+  // Send chat and get response
+  const response = await sendChatMessage(query);
+  
+  // Track analytics
+  if (user?.id && session?.id) {
+    AnalyticsTracker.trackChatQuery(user.id, session.id, query, response.length);
+  }
+};
+*/
+
+// =====================================
+// 8. Example Usage dalam komponen Writer Module
+// =====================================
+
+/*
+const handleDraftSave = async (draftData: any) => {
+  // Save draft logic...
+  const wordCount = calculateWordCount(draftData.content);
+  
+  // Track analytics
+  if (user?.id && draftId) {
+    AnalyticsTracker.trackDraftSave(user.id, draftId, wordCount);
+  }
+};
+
+const handleAnnotationAdd = async (annotation: any) => {
+  // Add annotation logic...
+  
+  // Track analytics
+  if (user?.id && articleId) {
+    AnalyticsTracker.trackAnnotationCreate(user.id, articleId, annotation.semanticTag || 'general');
+  }
+};
+
+const handleAIAssistance = async (prompt: string, type: string) => {
+  // AI assistance logic...
+  
+  // Track analytics
+  if (user?.id && currentDocument) {
+    AnalyticsTracker.trackAIAssistance(user.id, currentDocument.id, type, prompt.length);
+  }
+};
+*/
