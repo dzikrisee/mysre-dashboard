@@ -1,8 +1,3 @@
-// =====================================
-// FILE: src/lib/supabase.ts
-// ACTION: REPLACE existing file
-// =====================================
-
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -10,16 +5,16 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Updated User interface sesuai schema baru
+
 export interface User {
   id: string;
   email: string;
   name: string;
   password?: string;
-  role: 'USER' | 'ADMIN'; // Updated sesuai ENUM
+  role: 'USER' | 'ADMIN'; 
   createdAt: string;
-  updateAt: string; // Note: typo di schema, ikuti schema database
-  group?: string; // Changed from 'A'|'B' ke string
+  updateAt: string;
+  group?: string;
   nim?: string;
   avatar_url?: string;
 }

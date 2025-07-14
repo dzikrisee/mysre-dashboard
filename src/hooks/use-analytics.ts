@@ -1,8 +1,3 @@
-// =====================================
-// FILE: src/hooks/use-analytics.ts
-// ACTION: CREATE new file
-// =====================================
-
 import { useEffect } from 'react';
 import { useAuth } from '@/providers/auth-provider';
 import { AnalyticsTracker } from '@/lib/analytics-tracker';

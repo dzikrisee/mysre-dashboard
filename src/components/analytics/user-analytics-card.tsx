@@ -1,8 +1,3 @@
-// =====================================
-// FILE: src/components/analytics/user-analytics-card.tsx
-// ACTION: CREATE new file (create folder first: src/components/analytics/)
-// =====================================
-
 'use client';
 
 import { Card, Group, Text, Badge, Stack, SimpleGrid, Box, Tabs, Avatar, RingProgress, Center } from '@mantine/core';

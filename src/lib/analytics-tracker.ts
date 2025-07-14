@@ -1,8 +1,3 @@
-// =====================================
-// FILE: src/lib/analytics-tracker.ts
-// ACTION: CREATE new file
-// =====================================
-
 import { AnalyticsService } from './analytics';
 
 export class AnalyticsTracker {

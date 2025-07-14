@@ -1,8 +1,3 @@
-// =====================================
-// FILE: src/lib/analytics.ts
-// ACTION: CREATE new file
-// =====================================
-
 import { supabase, User } from './supabase';
 
 export interface LearningAnalytics {

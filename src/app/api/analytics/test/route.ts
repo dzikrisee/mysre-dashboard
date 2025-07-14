@@ -1,8 +1,3 @@
-// =====================================
-// FILE: src/app/api/analytics/test/route.ts
-// ACTION: CREATE new file (create folders: src/app/api/analytics/test/)
-// =====================================
-
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
