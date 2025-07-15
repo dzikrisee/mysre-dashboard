@@ -20,6 +20,9 @@ export interface User {
 }
 
 export interface AuthUser {
+  token_balance: any;
+  tier: string;
+  monthly_token_limit: any;
   id: string;
   email: string;
   name: string;
