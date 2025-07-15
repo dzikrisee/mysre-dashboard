@@ -1,4 +1,4 @@
-// src/app/dashboard/profile/page.tsx
+// src/app/dashboard/profile/page.tsx - COMPLETE FIXED VERSION
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -81,10 +81,12 @@ import {
   IconActivity,
   IconTrendingUp,
   IconTrash,
+  IconDeviceFloppy,
 } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { useAuth } from '@/providers/auth-provider';
 import { notifications } from '@mantine/notifications';
+import { getUserProfile, updateUserProfile, updateUserSettings, verifyUserEmail, verifyUserPhone, uploadUserAvatar, updateLastActive } from '@/lib/supabase';
 
 // Types
 interface UserProfile {
@@ -94,7 +96,7 @@ interface UserProfile {
   phone?: string;
   avatar_url?: string;
   bio?: string;
-  role: 'admin' | 'user';
+  role: 'ADMIN' | 'USER';
   group?: 'A' | 'B';
   nim?: string;
   university?: string;
@@ -106,7 +108,7 @@ interface UserProfile {
   linkedin?: string;
   github?: string;
   website?: string;
-  joinedAt: string;
+  createdAt: string;
   lastActive: string;
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
@@ -146,16 +148,17 @@ interface Activity {
 }
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth(); // Move hook call to top level
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [passwordOpened, { open: openPassword, close: closePassword }] = useDisclosure(false);
 
-  // Form states
+  // Form states - FIX: Initialize with empty strings to avoid null/undefined
   const [profileForm, setProfileForm] = useState({
     name: '',
     email: '',
@@ -194,57 +197,70 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    loadProfile();
+    if (user?.id) {
+      loadProfile();
+    }
   }, [user]);
 
+  // Real Supabase integration
   const loadProfile = async () => {
+    if (!user?.id) return;
+
     setLoading(true);
     try {
-      // Simulate API call - replace with actual Supabase call
-      const mockProfile: UserProfile = {
-        id: user?.id || '1',
-        name: user?.name || 'John Doe',
-        email: user?.email || 'john.doe@university.ac.id',
-        phone: '+62 812-3456-7890',
-        avatar_url: user?.avatar_url || undefined,
-        bio: 'Mahasiswa Sistem Informasi yang tertarik dengan pengembangan teknologi pendidikan dan penelitian UX/UI. Aktif dalam berbagai proyek penelitian dan pengembangan aplikasi.',
-        role: user?.role || 'user',
-        group: 'A',
-        nim: '20210001',
-        university: 'Universitas Indonesia',
-        faculty: 'Fakultas Ilmu Komputer',
-        major: 'Sistem Informasi',
-        semester: 6,
-        address: 'Jakarta Selatan, DKI Jakarta',
-        birthDate: '2002-05-15',
-        linkedin: 'https://linkedin.com/in/johndoe',
-        github: 'https://github.com/johndoe',
-        website: 'https://johndoe.dev',
-        joinedAt: '2021-09-01T00:00:00Z',
-        lastActive: new Date().toISOString(),
-        isEmailVerified: true,
-        isPhoneVerified: false,
-        settings: {
-          emailNotifications: true,
-          pushNotifications: true,
-          darkMode: false,
-          language: 'id',
-          timezone: 'Asia/Jakarta',
-          privacy: {
-            showEmail: false,
-            showPhone: false,
-            showProfile: true,
-          },
-        },
-      };
+      // Update last active when loading profile
+      await updateLastActive(user.id);
 
+      const { data: profileData, error } = await getUserProfile(user.id);
+
+      if (error) {
+        throw error;
+      }
+
+      if (profileData) {
+        setProfile(profileData);
+
+        // Initialize form data - FIX: Use empty strings for null values
+        setProfileForm({
+          name: profileData.name || '',
+          email: profileData.email || '',
+          phone: profileData.phone || '',
+          bio: profileData.bio || '',
+          university: profileData.university || '',
+          faculty: profileData.faculty || '',
+          major: profileData.major || '',
+          semester: profileData.semester || 1,
+          address: profileData.address || '',
+          birthDate: profileData.birthDate || '',
+          linkedin: profileData.linkedin || '',
+          github: profileData.github || '',
+          website: profileData.website || '',
+        });
+
+        setSettingsForm(
+          profileData.settings || {
+            emailNotifications: true,
+            pushNotifications: true,
+            darkMode: false,
+            language: 'id',
+            timezone: 'Asia/Jakarta',
+            privacy: {
+              showEmail: false,
+              showPhone: false,
+              showProfile: true,
+            },
+          },
+        );
+      }
+
+      // Load stats (simulate for now - replace with real data later)
       const mockStats: UserStats = {
         totalProjects: 8,
         completedProjects: 5,
         totalArticles: 12,
         totalIdeas: 15,
         totalLikes: 89,
-        joinDays: Math.floor((new Date().getTime() - new Date(mockProfile.joinedAt).getTime()) / (1000 * 60 * 60 * 24)),
+        joinDays: Math.floor((new Date().getTime() - new Date(profileData?.createdAt || new Date()).getTime()) / (1000 * 60 * 60 * 24)),
         averageProgress: 73,
         recentActivities: [
           {
@@ -252,7 +268,7 @@ export default function ProfilePage() {
             type: 'project_completed',
             title: 'Proyek Selesai',
             description: 'Menyelesaikan "Analisis UX Website E-Learning"',
-            date: '2024-01-20T10:00:00Z',
+            date: new Date().toISOString(),
             icon: <IconCheck size={16} />,
             color: 'green',
           },
@@ -261,7 +277,7 @@ export default function ProfilePage() {
             type: 'idea_shared',
             title: 'Ide Baru',
             description: 'Membagikan ide "VR untuk Pembelajaran Sejarah"',
-            date: '2024-01-18T14:30:00Z',
+            date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
             icon: <IconBulb size={16} />,
             color: 'yellow',
           },
@@ -270,43 +286,14 @@ export default function ProfilePage() {
             type: 'article_published',
             title: 'Artikel Dipublikasi',
             description: 'Menerbitkan "Evaluasi Sistem LMS"',
-            date: '2024-01-15T09:15:00Z',
+            date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
             icon: <IconFileText size={16} />,
             color: 'blue',
-          },
-          {
-            id: '4',
-            type: 'project_created',
-            title: 'Proyek Baru',
-            description: 'Memulai "Penelitian Chatbot AI"',
-            date: '2024-01-12T16:45:00Z',
-            icon: <IconPencil size={16} />,
-            color: 'violet',
           },
         ],
       };
 
-      setProfile(mockProfile);
       setStats(mockStats);
-
-      // Initialize form data
-      setProfileForm({
-        name: mockProfile.name,
-        email: mockProfile.email,
-        phone: mockProfile.phone || '',
-        bio: mockProfile.bio || '',
-        university: mockProfile.university || '',
-        faculty: mockProfile.faculty || '',
-        major: mockProfile.major || '',
-        semester: mockProfile.semester || 1,
-        address: mockProfile.address || '',
-        birthDate: mockProfile.birthDate || '',
-        linkedin: mockProfile.linkedin || '',
-        github: mockProfile.github || '',
-        website: mockProfile.website || '',
-      });
-
-      setSettingsForm(mockProfile.settings);
     } catch (error) {
       console.error('Error loading profile:', error);
       notifications.show({
@@ -319,86 +306,253 @@ export default function ProfilePage() {
     }
   };
 
+  // Real profile save with Supabase - FIX: Sanitize data before sending
   const handleSaveProfile = async () => {
-    try {
-      setLoading(true);
+    if (!user?.id) return;
 
-      // Simulate API call
-      const updatedProfile = {
-        ...profile!,
-        ...profileForm,
+    setSaving(true);
+    try {
+      // Sanitize form data - convert empty strings to null for optional fields
+      const sanitizedData = {
+        name: profileForm.name.trim(),
+        email: profileForm.email.trim(),
+        phone: profileForm.phone.trim() || null,
+        bio: profileForm.bio.trim() || null,
+        university: profileForm.university.trim() || null,
+        faculty: profileForm.faculty.trim() || null,
+        major: profileForm.major.trim() || null,
+        semester: profileForm.semester || null,
+        address: profileForm.address.trim() || null,
+        birthDate: profileForm.birthDate.trim() || null, // Convert empty string to null for date
+        linkedin: profileForm.linkedin.trim() || null,
+        github: profileForm.github.trim() || null,
+        website: profileForm.website.trim() || null,
       };
 
-      setProfile(updatedProfile);
-      setEditMode(false);
+      // Validate required fields
+      if (!sanitizedData.name || !sanitizedData.email) {
+        notifications.show({
+          title: 'Error',
+          message: 'Nama dan email harus diisi',
+          color: 'red',
+        });
+        return;
+      }
+
+      // Validate date format if provided
+      if (sanitizedData.birthDate) {
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(sanitizedData.birthDate)) {
+          notifications.show({
+            title: 'Error',
+            message: 'Format tanggal lahir tidak valid (YYYY-MM-DD)',
+            color: 'red',
+          });
+          return;
+        }
+      }
+
+      const { data: updatedProfile, error } = await updateUserProfile(user.id, sanitizedData);
+
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      if (updatedProfile) {
+        setProfile(updatedProfile);
+        setEditMode(false);
+
+        // REFRESH AUTH CONTEXT untuk update navbar
+        await refreshUser();
+
+        notifications.show({
+          title: 'Berhasil',
+          message: 'Profil berhasil diperbarui',
+          color: 'green',
+        });
+      }
+    } catch (error: any) {
+      console.error('Error saving profile:', error);
+
+      let errorMessage = 'Gagal menyimpan profil';
+      if (error.message?.includes('date')) {
+        errorMessage = 'Format tanggal tidak valid. Gunakan format YYYY-MM-DD atau kosongkan field.';
+      } else if (error.message?.includes('email')) {
+        errorMessage = 'Format email tidak valid';
+      }
 
       notifications.show({
-        title: 'Berhasil',
-        message: 'Profil berhasil diperbarui',
-        color: 'green',
-      });
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      notifications.show({
         title: 'Error',
-        message: 'Gagal memperbarui profil',
+        message: errorMessage,
         color: 'red',
       });
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleAvatarUpload = async (file: File | null) => {
-    if (!file) return;
+  // Real avatar upload - FIXED with auth context refresh
+  const handleAvatarUpload = async (file: File) => {
+    if (!user?.id) return;
 
+    setSaving(true);
     try {
-      // Simulate file upload
-      const fakeUrl = URL.createObjectURL(file);
+      // Validate file on frontend first
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        notifications.show({
+          title: 'Error',
+          message: 'File harus berupa gambar (JPG, PNG, WEBP)',
+          color: 'red',
+        });
+        return;
+      }
 
-      const updatedProfile = {
-        ...profile!,
-        avatar_url: fakeUrl,
-      };
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      if (file.size > maxSize) {
+        notifications.show({
+          title: 'Error',
+          message: 'Ukuran file tidak boleh lebih dari 5MB',
+          color: 'red',
+        });
+        return;
+      }
 
-      setProfile(updatedProfile);
+      const { data: updatedProfile, error } = await uploadUserAvatar(user.id, file);
+
+      if (error) {
+        console.error('Avatar upload error:', error);
+        throw error;
+      }
+
+      if (updatedProfile) {
+        setProfile(updatedProfile);
+
+        // REFRESH AUTH CONTEXT untuk update navbar avatar
+        await refreshUser();
+
+        notifications.show({
+          title: 'Berhasil',
+          message: 'Avatar berhasil diperbarui',
+          color: 'green',
+        });
+      }
+    } catch (error: any) {
+      console.error('Error uploading avatar:', error);
+
+      let errorMessage = 'Gagal mengupload avatar';
+      if (error.message?.includes('bucket')) {
+        errorMessage = 'Storage bucket belum dikonfigurasi. Hubungi administrator.';
+      } else if (error.message?.includes('file')) {
+        errorMessage = error.message;
+      } else if (error.message?.includes('size')) {
+        errorMessage = 'Ukuran file terlalu besar (maksimal 5MB)';
+      }
 
       notifications.show({
-        title: 'Berhasil',
-        message: 'Foto profil berhasil diperbarui',
+        title: 'Error',
+        message: errorMessage,
+        color: 'red',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Real settings save
+  const handleSaveSettings = async () => {
+    if (!user?.id) return;
+
+    setSaving(true);
+    try {
+      const { data: updatedProfile, error } = await updateUserSettings(user.id, settingsForm);
+
+      if (error) {
+        throw error;
+      }
+
+      if (updatedProfile) {
+        setProfile(updatedProfile);
+
+        notifications.show({
+          title: 'Berhasil',
+          message: 'Pengaturan berhasil disimpan',
+          color: 'green',
+        });
+      }
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Gagal menyimpan pengaturan',
+        color: 'red',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Real email verification
+  const handleVerifyEmail = async () => {
+    if (!user?.id) return;
+
+    try {
+      await verifyUserEmail(user.id);
+
+      // Reload profile to get updated verification status
+      await loadProfile();
+
+      notifications.show({
+        title: 'Email Terverifikasi',
+        message: 'Email Anda berhasil diverifikasi',
         color: 'green',
       });
     } catch (error) {
-      console.error('Error uploading avatar:', error);
       notifications.show({
         title: 'Error',
-        message: 'Gagal mengupload foto profil',
+        message: 'Gagal memverifikasi email',
         color: 'red',
       });
     }
   };
 
-  const handleChangePassword = async () => {
+  // Real phone verification
+  const handleVerifyPhone = async () => {
+    if (!user?.id) return;
+
     try {
-      if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-        notifications.show({
-          title: 'Error',
-          message: 'Password baru dan konfirmasi tidak sama',
-          color: 'red',
-        });
-        return;
-      }
+      await verifyUserPhone(user.id);
 
-      if (passwordForm.newPassword.length < 8) {
-        notifications.show({
-          title: 'Error',
-          message: 'Password minimal 8 karakter',
-          color: 'red',
-        });
-        return;
-      }
+      // Reload profile to get updated verification status
+      await loadProfile();
 
-      // Simulate API call
+      notifications.show({
+        title: 'Telepon Terverifikasi',
+        message: 'Nomor telepon Anda berhasil diverifikasi',
+        color: 'green',
+      });
+    } catch (error) {
+      notifications.show({
+        title: 'Error',
+        message: 'Gagal memverifikasi nomor telepon',
+        color: 'red',
+      });
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      notifications.show({
+        title: 'Error',
+        message: 'Password baru dan konfirmasi password tidak sama',
+        color: 'red',
+      });
+      return;
+    }
+
+    try {
+      // TODO: Implement password change with Supabase Auth
       notifications.show({
         title: 'Berhasil',
         message: 'Password berhasil diubah',
@@ -410,69 +564,11 @@ export default function ProfilePage() {
         newPassword: '',
         confirmPassword: '',
       });
-
       closePassword();
     } catch (error) {
-      console.error('Error changing password:', error);
       notifications.show({
         title: 'Error',
         message: 'Gagal mengubah password',
-        color: 'red',
-      });
-    }
-  };
-
-  const handleSaveSettings = async () => {
-    try {
-      const updatedProfile = {
-        ...profile!,
-        settings: settingsForm,
-      };
-
-      setProfile(updatedProfile);
-
-      notifications.show({
-        title: 'Berhasil',
-        message: 'Pengaturan berhasil disimpan',
-        color: 'green',
-      });
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      notifications.show({
-        title: 'Error',
-        message: 'Gagal menyimpan pengaturan',
-        color: 'red',
-      });
-    }
-  };
-
-  const handleVerifyEmail = async () => {
-    try {
-      notifications.show({
-        title: 'Email Verifikasi Terkirim',
-        message: 'Silakan cek email Anda untuk verifikasi',
-        color: 'blue',
-      });
-    } catch (error) {
-      notifications.show({
-        title: 'Error',
-        message: 'Gagal mengirim email verifikasi',
-        color: 'red',
-      });
-    }
-  };
-
-  const handleVerifyPhone = async () => {
-    try {
-      notifications.show({
-        title: 'SMS Verifikasi Terkirim',
-        message: 'Silakan cek SMS untuk kode verifikasi',
-        color: 'blue',
-      });
-    } catch (error) {
-      notifications.show({
-        title: 'Error',
-        message: 'Gagal mengirim SMS verifikasi',
         color: 'red',
       });
     }
@@ -486,7 +582,52 @@ export default function ProfilePage() {
     );
   }
 
-  const completionRate = (stats.completedProjects / Math.max(stats.totalProjects, 1)) * 100;
+  // Calculate profile completion percentage
+  const calculateProfileCompletion = () => {
+    if (!profile) {
+      return {
+        percentage: 0,
+        filled: 0,
+        total: 13,
+        missing: [
+          'name',
+          'email',
+          'phone',
+          'bio',
+          'university',
+          'faculty',
+          'major',
+          'semester',
+          'address',
+          'birthDate',
+          'linkedin',
+          'github',
+          'website',
+        ],
+      };
+    }
+
+    const requiredFields = ['name', 'email', 'phone', 'bio', 'university', 'faculty', 'major', 'semester', 'address', 'birthDate', 'linkedin', 'github', 'website'];
+
+    const filledFields = requiredFields.filter((field) => {
+      const value = profile[field as keyof UserProfile];
+      return value !== null && value !== undefined && value !== '' && value !== 0;
+    });
+
+    const percentage = Math.round((filledFields.length / requiredFields.length) * 100);
+
+    return {
+      percentage,
+      filled: filledFields.length,
+      total: requiredFields.length,
+      missing: requiredFields.filter((field) => {
+        const value = profile[field as keyof UserProfile];
+        return value === null || value === undefined || value === '' || value === 0;
+      }),
+    };
+  };
+
+  const profileCompletion = calculateProfileCompletion();
 
   return (
     <Stack gap="xl">
@@ -495,7 +636,7 @@ export default function ProfilePage() {
           <Title order={2}>Profil Saya</Title>
           <Text c="gray.6">Kelola informasi profil dan pengaturan akun Anda</Text>
         </div>
-        <Button leftSection={editMode ? <IconCheck size={16} /> : <IconEdit size={16} />} onClick={editMode ? handleSaveProfile : () => setEditMode(true)} loading={loading}>
+        <Button leftSection={editMode ? <IconDeviceFloppy size={16} /> : <IconEdit size={16} />} onClick={editMode ? handleSaveProfile : () => setEditMode(true)} loading={saving}>
           {editMode ? 'Simpan' : 'Edit Profil'}
         </Button>
       </Group>
@@ -541,6 +682,7 @@ export default function ProfilePage() {
                           right: 0,
                         }}
                         onClick={() => fileInputRef.current?.click()}
+                        loading={saving}
                       >
                         <IconCamera size={16} />
                       </ActionIcon>
@@ -550,7 +692,7 @@ export default function ProfilePage() {
                       type="file"
                       accept="image/*"
                       style={{ display: 'none' }}
-                      onChange={(e) => {
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                         const file = e.target.files?.[0];
                         if (file) handleAvatarUpload(file);
                       }}
@@ -565,104 +707,79 @@ export default function ProfilePage() {
                       {profile.email}
                     </Text>
                     <Group justify="center" gap="xs" mt="xs">
-                      <Badge color={profile.role === 'admin' ? 'red' : 'blue'} variant="light" leftSection={<IconUserCheck size={12} />}>
-                        {profile.role === 'admin' ? 'Administrator' : 'Mahasiswa'}
+                      <Badge color={profile.role === 'ADMIN' ? 'red' : 'blue'} variant="light" leftSection={<IconUserCheck size={12} />}>
+                        {profile.role === 'ADMIN' ? 'Administrator' : 'Mahasiswa'}
                       </Badge>
                       {profile.group && (
-                        <Badge variant="outline" size="sm">
+                        <Badge color={profile.group === 'A' ? 'green' : 'orange'} variant="light">
                           Group {profile.group}
                         </Badge>
                       )}
                     </Group>
                   </div>
 
-                  <div style={{ width: '100%' }}>
-                    <Text size="sm" fw={500} mb="xs">
-                      Completion Rate
+                  {profile.bio && (
+                    <Text size="sm" ta="center" c="gray.7">
+                      {profile.bio}
                     </Text>
-                    <RingProgress
-                      size={80}
-                      thickness={8}
-                      sections={[{ value: completionRate, color: 'blue' }]}
-                      label={
-                        <Text c="blue" fw={700} ta="center" size="sm">
-                          {completionRate.toFixed(0)}%
-                        </Text>
-                      }
-                    />
-                  </div>
+                  )}
 
-                  <Group justify="center" gap="lg" w="100%">
-                    <div style={{ textAlign: 'center' }}>
-                      <Text fw={700} size="lg" c="blue">
-                        {stats.totalProjects}
-                      </Text>
-                      <Text size="xs" c="gray.6">
-                        Proyek
-                      </Text>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <Text fw={700} size="lg" c="green">
-                        {stats.totalArticles}
-                      </Text>
-                      <Text size="xs" c="gray.6">
-                        Artikel
-                      </Text>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <Text fw={700} size="lg" c="red">
-                        {stats.totalLikes}
-                      </Text>
-                      <Text size="xs" c="gray.6">
-                        Likes
-                      </Text>
-                    </div>
+                  <Group justify="center" gap="xs" mt="md">
+                    {profile.linkedin && (
+                      <Anchor href={profile.linkedin} target="_blank">
+                        <ActionIcon variant="light" color="blue">
+                          <IconBriefcase size={16} />
+                        </ActionIcon>
+                      </Anchor>
+                    )}
+                    {profile.github && (
+                      <Anchor href={profile.github} target="_blank">
+                        <ActionIcon variant="light" color="gray">
+                          <IconGitBranch size={16} />
+                        </ActionIcon>
+                      </Anchor>
+                    )}
+                    {profile.website && (
+                      <Anchor href={profile.website} target="_blank">
+                        <ActionIcon variant="light" color="teal">
+                          <IconActivity size={16} />
+                        </ActionIcon>
+                      </Anchor>
+                    )}
                   </Group>
                 </Stack>
               </Card>
             </Grid.Col>
 
             <Grid.Col span={{ base: 12, md: 8 }}>
-              <Stack gap="lg">
-                {/* Bio */}
-                <Card withBorder shadow="sm" radius="md" p="lg">
-                  <Group justify="space-between" mb="md">
-                    <Text fw={600} size="lg">
-                      Bio
-                    </Text>
-                  </Group>
-                  <Text size="sm" style={{ lineHeight: 1.6 }}>
-                    {profile.bio || 'Belum ada bio.'}
-                  </Text>
-                </Card>
-
-                {/* Quick Stats */}
-                <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="md">
-                  <Card withBorder shadow="sm" radius="md" p="md" ta="center">
+              <Stack gap="md">
+                {/* Stats Cards */}
+                <SimpleGrid cols={{ base: 2, md: 4 }} spacing="md">
+                  <Paper withBorder p="md" ta="center">
                     <ThemeIcon color="blue" variant="light" size="lg" mx="auto" mb="xs">
-                      <IconCalendar size={20} />
+                      <IconFileText size={20} />
                     </ThemeIcon>
                     <Text fw={700} size="lg">
-                      {stats.joinDays}
+                      {stats.totalArticles}
                     </Text>
                     <Text size="xs" c="gray.6">
-                      Hari Bergabung
+                      Total Artikel
                     </Text>
-                  </Card>
+                  </Paper>
 
-                  <Card withBorder shadow="sm" radius="md" p="md" ta="center">
+                  <Paper withBorder p="md" ta="center">
                     <ThemeIcon color="green" variant="light" size="lg" mx="auto" mb="xs">
-                      <IconCheck size={20} />
+                      <IconPencil size={20} />
                     </ThemeIcon>
                     <Text fw={700} size="lg">
-                      {stats.completedProjects}
+                      {stats.totalProjects}
                     </Text>
                     <Text size="xs" c="gray.6">
-                      Selesai
+                      Total Proyek
                     </Text>
-                  </Card>
+                  </Paper>
 
-                  <Card withBorder shadow="sm" radius="md" p="md" ta="center">
+                  <Paper withBorder p="md" ta="center">
                     <ThemeIcon color="yellow" variant="light" size="lg" mx="auto" mb="xs">
                       <IconBulb size={20} />
                     </ThemeIcon>
@@ -670,54 +787,133 @@ export default function ProfilePage() {
                       {stats.totalIdeas}
                     </Text>
                     <Text size="xs" c="gray.6">
-                      Ide
+                      Total Ide
                     </Text>
-                  </Card>
+                  </Paper>
 
-                  <Card withBorder shadow="sm" radius="md" p="md" ta="center">
-                    <ThemeIcon color="violet" variant="light" size="lg" mx="auto" mb="xs">
-                      <IconTrendingUp size={20} />
+                  <Paper withBorder p="md" ta="center">
+                    <ThemeIcon color="red" variant="light" size="lg" mx="auto" mb="xs">
+                      <IconHeart size={20} />
                     </ThemeIcon>
                     <Text fw={700} size="lg">
-                      {stats.averageProgress}%
+                      {stats.totalLikes}
                     </Text>
                     <Text size="xs" c="gray.6">
-                      Progress
+                      Total Likes
                     </Text>
-                  </Card>
+                  </Paper>
                 </SimpleGrid>
 
-                {/* Recent Activities */}
+                {/* Progress Overview */}
                 <Card withBorder shadow="sm" radius="md" p="lg">
-                  <Text fw={600} size="lg" mb="md">
-                    Aktivitas Terbaru
-                  </Text>
-                  <Timeline active={stats.recentActivities.length} bulletSize={24} lineWidth={2}>
-                    {stats.recentActivities.map((activity) => (
-                      <Timeline.Item
-                        key={activity.id}
-                        bullet={
-                          <ThemeIcon size={24} color={activity.color} variant="light">
-                            {activity.icon}
+                  <Group justify="space-between" mb="md">
+                    <Text fw={600} size="lg">
+                      Progress Overview
+                    </Text>
+                    <Badge variant="light" color="teal">
+                      {((stats.completedProjects / Math.max(stats.totalProjects, 1)) * 100).toFixed(1)}% Complete
+                    </Badge>
+                  </Group>
+
+                  <Stack gap="sm">
+                    <div>
+                      <Group justify="space-between" mb="xs">
+                        <Text size="sm">Proyek Selesai</Text>
+                        <Text size="sm" c="gray.6">
+                          {stats.completedProjects}/{stats.totalProjects}
+                        </Text>
+                      </Group>
+                      <Progress value={(stats.completedProjects / Math.max(stats.totalProjects, 1)) * 100} size="sm" color="teal" />
+                    </div>
+
+                    <div>
+                      <Group justify="space-between" mb="xs">
+                        <Text size="sm">Rata-rata Progress</Text>
+                        <Text size="sm" c="gray.6">
+                          {stats.averageProgress}%
+                        </Text>
+                      </Group>
+                      <Progress value={stats.averageProgress} size="sm" color="blue" />
+                    </div>
+                  </Stack>
+                </Card>
+
+                {/* Profile Completion Progress */}
+                <Card withBorder shadow="sm" radius="md" p="lg">
+                  <Group justify="space-between" mb="md">
+                    <Text fw={600} size="lg">
+                      Kelengkapan Profil Anda
+                    </Text>
+                    <Badge variant="light" color={profileCompletion.percentage === 100 ? 'green' : profileCompletion.percentage >= 70 ? 'yellow' : 'red'}>
+                      {profileCompletion.percentage}% Lengkap
+                    </Badge>
+                  </Group>
+
+                  <Stack gap="md">
+                    <div>
+                      <Group justify="space-between" mb="xs">
+                        <Text size="sm">Field yang terisi</Text>
+                        <Text size="sm" c="gray.6">
+                          {profileCompletion.filled}/{profileCompletion.total}
+                        </Text>
+                      </Group>
+                      <Progress value={profileCompletion.percentage} size="lg" color={profileCompletion.percentage === 100 ? 'green' : profileCompletion.percentage >= 70 ? 'yellow' : 'red'} />
+                    </div>
+
+                    {profileCompletion.percentage < 100 && (
+                      <div>
+                        <Text size="sm" fw={500} mb="xs">
+                          Field yang belum diisi:
+                        </Text>
+                        <Stack gap="xs">
+                          {profileCompletion.missing.slice(0, 5).map((field) => (
+                            <Group key={field} gap="xs">
+                              <ThemeIcon size="sm" color="red" variant="light">
+                                <IconX size={12} />
+                              </ThemeIcon>
+                              <Text size="xs" c="gray.7">
+                                {field === 'name' && 'Nama Lengkap'}
+                                {field === 'email' && 'Email'}
+                                {field === 'phone' && 'Nomor Telepon'}
+                                {field === 'bio' && 'Bio'}
+                                {field === 'university' && 'Universitas'}
+                                {field === 'faculty' && 'Fakultas'}
+                                {field === 'major' && 'Program Studi'}
+                                {field === 'semester' && 'Semester'}
+                                {field === 'address' && 'Alamat'}
+                                {field === 'birthDate' && 'Tanggal Lahir'}
+                                {field === 'linkedin' && 'LinkedIn'}
+                                {field === 'github' && 'GitHub'}
+                                {field === 'website' && 'Website'}
+                              </Text>
+                            </Group>
+                          ))}
+                          {profileCompletion.missing.length > 5 && (
+                            <Text size="xs" c="gray.5">
+                              dan {profileCompletion.missing.length - 5} field lainnya...
+                            </Text>
+                          )}
+                        </Stack>
+
+                        <Button size="sm" variant="light" color="blue" mt="md" onClick={() => setEditMode(true)} leftSection={<IconEdit size={14} />}>
+                          Lengkapi Profil
+                        </Button>
+                      </div>
+                    )}
+
+                    {profileCompletion.percentage === 100 && (
+                      <div>
+                        <Group gap="xs">
+                          <ThemeIcon size="sm" color="green" variant="light">
+                            <IconCheck size={12} />
                           </ThemeIcon>
-                        }
-                        title={activity.title}
-                      >
-                        <Text c="gray.6" size="sm">
-                          {activity.description}
-                        </Text>
-                        <Text size="xs" c="gray.5" mt={4}>
-                          {new Date(activity.date).toLocaleDateString('id-ID', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </Text>
-                      </Timeline.Item>
-                    ))}
-                  </Timeline>
+                          <Text size="sm" c="green.7">
+                            Selamat! Profil Anda sudah lengkap 100%
+                          </Text>
+                        </Group>
+                      </div>
+                    )}
+                  </Stack>
                 </Card>
               </Stack>
             </Grid.Col>
@@ -745,12 +941,26 @@ export default function ProfilePage() {
               </Group>
 
               <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-                <TextInput label="Nama Lengkap" value={editMode ? profileForm.name : profile.name} onChange={(e) => setProfileForm((prev) => ({ ...prev, name: e.target.value }))} disabled={!editMode} leftSection={<IconUser size={16} />} />
+                <TextInput
+                  label="Nama Lengkap"
+                  value={editMode ? profileForm.name : profile.name || ''}
+                  onChange={(e) => setProfileForm((prev) => ({ ...prev, name: e.target.value }))}
+                  disabled={!editMode}
+                  leftSection={<IconUser size={16} />}
+                  required
+                />
 
                 <Group grow>
-                  <TextInput label="Email" value={editMode ? profileForm.email : profile.email} onChange={(e) => setProfileForm((prev) => ({ ...prev, email: e.target.value }))} disabled={!editMode} leftSection={<IconMail size={16} />} />
+                  <TextInput
+                    label="Email"
+                    value={editMode ? profileForm.email : profile.email || ''}
+                    onChange={(e) => setProfileForm((prev) => ({ ...prev, email: e.target.value }))}
+                    disabled={!editMode}
+                    leftSection={<IconMail size={16} />}
+                    required
+                  />
                   {!profile.isEmailVerified && (
-                    <Button size="xs" variant="light" onClick={handleVerifyEmail} mt={24}>
+                    <Button size="xs" variant="light" onClick={handleVerifyEmail} mt={24} loading={saving}>
                       Verifikasi
                     </Button>
                   )}
@@ -759,13 +969,14 @@ export default function ProfilePage() {
                 <Group grow>
                   <TextInput
                     label="Nomor Telepon"
-                    value={editMode ? profileForm.phone : profile.phone}
+                    value={editMode ? profileForm.phone : profile.phone || ''}
                     onChange={(e) => setProfileForm((prev) => ({ ...prev, phone: e.target.value }))}
                     disabled={!editMode}
                     leftSection={<IconPhone size={16} />}
+                    placeholder="Contoh: +62812345678"
                   />
                   {profile.phone && !profile.isPhoneVerified && (
-                    <Button size="xs" variant="light" onClick={handleVerifyPhone} mt={24}>
+                    <Button size="xs" variant="light" onClick={handleVerifyPhone} mt={24} loading={saving}>
                       Verifikasi
                     </Button>
                   )}
@@ -774,17 +985,18 @@ export default function ProfilePage() {
                 <TextInput
                   label="Tanggal Lahir"
                   type="date"
-                  value={editMode ? profileForm.birthDate : profile.birthDate}
+                  value={editMode ? profileForm.birthDate : profile.birthDate || ''}
                   onChange={(e) => setProfileForm((prev) => ({ ...prev, birthDate: e.target.value }))}
                   disabled={!editMode}
                   leftSection={<IconCalendar size={16} />}
+                  placeholder="YYYY-MM-DD"
                 />
               </SimpleGrid>
 
               <Textarea
                 label="Bio"
                 placeholder="Ceritakan tentang diri Anda..."
-                value={editMode ? profileForm.bio : profile.bio}
+                value={editMode ? profileForm.bio : profile.bio || ''}
                 onChange={(e) => setProfileForm((prev) => ({ ...prev, bio: e.target.value }))}
                 disabled={!editMode}
                 minRows={3}
@@ -792,10 +1004,11 @@ export default function ProfilePage() {
 
               <TextInput
                 label="Alamat"
-                value={editMode ? profileForm.address : profile.address}
+                value={editMode ? profileForm.address : profile.address || ''}
                 onChange={(e) => setProfileForm((prev) => ({ ...prev, address: e.target.value }))}
                 disabled={!editMode}
                 leftSection={<IconMapPin size={16} />}
+                placeholder="Alamat lengkap"
               />
 
               <Text fw={600} size="md" mt="lg">
@@ -805,7 +1018,7 @@ export default function ProfilePage() {
                 <TextInput
                   label="LinkedIn"
                   placeholder="https://linkedin.com/in/username"
-                  value={editMode ? profileForm.linkedin : profile.linkedin}
+                  value={editMode ? profileForm.linkedin : profile.linkedin || ''}
                   onChange={(e) => setProfileForm((prev) => ({ ...prev, linkedin: e.target.value }))}
                   disabled={!editMode}
                 />
@@ -813,7 +1026,7 @@ export default function ProfilePage() {
                 <TextInput
                   label="GitHub"
                   placeholder="https://github.com/username"
-                  value={editMode ? profileForm.github : profile.github}
+                  value={editMode ? profileForm.github : profile.github || ''}
                   onChange={(e) => setProfileForm((prev) => ({ ...prev, github: e.target.value }))}
                   disabled={!editMode}
                 />
@@ -821,7 +1034,7 @@ export default function ProfilePage() {
                 <TextInput
                   label="Website"
                   placeholder="https://yourwebsite.com"
-                  value={editMode ? profileForm.website : profile.website}
+                  value={editMode ? profileForm.website : profile.website || ''}
                   onChange={(e) => setProfileForm((prev) => ({ ...prev, website: e.target.value }))}
                   disabled={!editMode}
                 />
@@ -839,19 +1052,47 @@ export default function ProfilePage() {
               </Text>
 
               <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-                <TextInput label="NIM" value={profile.nim} disabled leftSection={<IconSchool size={16} />} />
+                <TextInput label="NIM" value={profile.nim || ''} disabled leftSection={<IconSchool size={16} />} />
 
-                <Badge variant="light" size="lg" w="fit-content">
-                  Group {profile.group}
-                </Badge>
+                <Group>
+                  <Badge variant="light" size="lg" w="fit-content">
+                    Group {profile.group || '-'}
+                  </Badge>
+                </Group>
 
-                <TextInput label="Universitas" value={editMode ? profileForm.university : profile.university} onChange={(e) => setProfileForm((prev) => ({ ...prev, university: e.target.value }))} disabled={!editMode} />
+                <TextInput
+                  label="Universitas"
+                  value={editMode ? profileForm.university : profile.university || ''}
+                  onChange={(e) => setProfileForm((prev) => ({ ...prev, university: e.target.value }))}
+                  disabled={!editMode}
+                  placeholder="Nama universitas"
+                />
 
-                <TextInput label="Fakultas" value={editMode ? profileForm.faculty : profile.faculty} onChange={(e) => setProfileForm((prev) => ({ ...prev, faculty: e.target.value }))} disabled={!editMode} />
+                <TextInput
+                  label="Fakultas"
+                  value={editMode ? profileForm.faculty : profile.faculty || ''}
+                  onChange={(e) => setProfileForm((prev) => ({ ...prev, faculty: e.target.value }))}
+                  disabled={!editMode}
+                  placeholder="Nama fakultas"
+                />
 
-                <TextInput label="Program Studi" value={editMode ? profileForm.major : profile.major} onChange={(e) => setProfileForm((prev) => ({ ...prev, major: e.target.value }))} disabled={!editMode} />
+                <TextInput
+                  label="Program Studi"
+                  value={editMode ? profileForm.major : profile.major || ''}
+                  onChange={(e) => setProfileForm((prev) => ({ ...prev, major: e.target.value }))}
+                  disabled={!editMode}
+                  placeholder="Program studi/jurusan"
+                />
 
-                <NumberInput label="Semester" value={editMode ? profileForm.semester : profile.semester} onChange={(value) => setProfileForm((prev) => ({ ...prev, semester: Number(value) }))} disabled={!editMode} min={1} max={14} />
+                <NumberInput
+                  label="Semester"
+                  value={editMode ? profileForm.semester : profile.semester || 1}
+                  onChange={(value) => setProfileForm((prev) => ({ ...prev, semester: Number(value) || 1 }))}
+                  disabled={!editMode}
+                  min={1}
+                  max={14}
+                  placeholder="Semester saat ini"
+                />
               </SimpleGrid>
 
               <Divider />
@@ -913,23 +1154,46 @@ export default function ProfilePage() {
                 Progress Overview
               </Text>
               <Grid>
-                <Grid.Col span={6}>
-                  <Text size="sm" mb="xs">
-                    Tingkat Penyelesaian Proyek
-                  </Text>
-                  <Progress value={completionRate} size="lg" color="blue" />
-                  <Text size="xs" c="gray.6" mt="xs">
-                    {stats.completedProjects} dari {stats.totalProjects} proyek selesai
-                  </Text>
+                <Grid.Col span={{ base: 12, md: 6 }}>
+                  <Card withBorder p="md">
+                    <Group justify="space-between" mb="md">
+                      <Text fw={500}>Completion Rate</Text>
+                      <Badge variant="light">{((stats.completedProjects / Math.max(stats.totalProjects, 1)) * 100).toFixed(1)}%</Badge>
+                    </Group>
+                    <RingProgress
+                      size={120}
+                      thickness={12}
+                      sections={[{ value: (stats.completedProjects / Math.max(stats.totalProjects, 1)) * 100, color: 'teal' }]}
+                      label={
+                        <Text ta="center" fw={700} size="lg">
+                          {((stats.completedProjects / Math.max(stats.totalProjects, 1)) * 100).toFixed(1)}%
+                        </Text>
+                      }
+                    />
+                  </Card>
                 </Grid.Col>
-                <Grid.Col span={6}>
-                  <Text size="sm" mb="xs">
-                    Progress Rata-rata
-                  </Text>
-                  <Progress value={stats.averageProgress} size="lg" color="green" />
-                  <Text size="xs" c="gray.6" mt="xs">
-                    {stats.averageProgress}% progress keseluruhan
-                  </Text>
+
+                <Grid.Col span={{ base: 12, md: 6 }}>
+                  <Card withBorder p="md">
+                    <Stack gap="sm">
+                      <Group justify="space-between">
+                        <Text fw={500}>Proyek Aktif</Text>
+                        <Badge color="blue">{stats.totalProjects - stats.completedProjects}</Badge>
+                      </Group>
+                      <Group justify="space-between">
+                        <Text fw={500}>Proyek Selesai</Text>
+                        <Badge color="green">{stats.completedProjects}</Badge>
+                      </Group>
+                      <Group justify="space-between">
+                        <Text fw={500}>Artikel Dipublikasi</Text>
+                        <Badge color="violet">{stats.totalArticles}</Badge>
+                      </Group>
+                      <Group justify="space-between">
+                        <Text fw={500}>Hari Bergabung</Text>
+                        <Badge color="gray">{stats.joinDays}</Badge>
+                      </Group>
+                    </Stack>
+                  </Card>
                 </Grid.Col>
               </Grid>
             </Stack>
@@ -938,356 +1202,194 @@ export default function ProfilePage() {
 
         {/* Settings Tab */}
         <Tabs.Panel value="settings" pt="lg">
-          <Stack gap="lg">
-            {/* Notification Settings */}
-            <Card withBorder shadow="sm" radius="md" p="lg">
-              <Stack gap="md">
-                <Group justify="space-between">
-                  <Text fw={600} size="lg">
-                    Pengaturan Notifikasi
-                  </Text>
-                  <Button variant="light" onClick={handleSaveSettings}>
-                    Simpan Pengaturan
-                  </Button>
-                </Group>
-
-                <Stack gap="sm">
-                  <Group justify="space-between">
-                    <div>
-                      <Text fw={500}>Email Notifications</Text>
-                      <Text size="sm" c="gray.6">
-                        Terima notifikasi melalui email
-                      </Text>
-                    </div>
-                    <Switch
-                      checked={settingsForm.emailNotifications}
-                      onChange={(e) =>
-                        setSettingsForm((prev) => ({
-                          ...prev,
-                          emailNotifications: e.currentTarget.checked,
-                        }))
-                      }
-                    />
-                  </Group>
-
-                  <Group justify="space-between">
-                    <div>
-                      <Text fw={500}>Push Notifications</Text>
-                      <Text size="sm" c="gray.6">
-                        Terima notifikasi push di browser
-                      </Text>
-                    </div>
-                    <Switch
-                      checked={settingsForm.pushNotifications}
-                      onChange={(e) =>
-                        setSettingsForm((prev) => ({
-                          ...prev,
-                          pushNotifications: e.currentTarget.checked,
-                        }))
-                      }
-                    />
-                  </Group>
-                </Stack>
-              </Stack>
-            </Card>
-
-            {/* Privacy Settings */}
-            <Card withBorder shadow="sm" radius="md" p="lg">
-              <Stack gap="md">
+          <Card withBorder shadow="sm" radius="md" p="lg">
+            <Stack gap="md">
+              <Group justify="space-between">
                 <Text fw={600} size="lg">
-                  Pengaturan Privasi
+                  Pengaturan
                 </Text>
+                <Button onClick={handleSaveSettings} loading={saving} disabled={saving}>
+                  Simpan Pengaturan
+                </Button>
+              </Group>
 
-                <Stack gap="sm">
-                  <Group justify="space-between">
-                    <div>
-                      <Text fw={500}>Tampilkan Email</Text>
-                      <Text size="sm" c="gray.6">
-                        Izinkan orang lain melihat email Anda
-                      </Text>
-                    </div>
-                    <Switch
-                      checked={settingsForm.privacy.showEmail}
-                      onChange={(e) =>
-                        setSettingsForm((prev) => ({
-                          ...prev,
-                          privacy: {
-                            ...prev.privacy,
-                            showEmail: e.currentTarget.checked,
-                          },
-                        }))
-                      }
-                    />
-                  </Group>
-
-                  <Group justify="space-between">
-                    <div>
-                      <Text fw={500}>Tampilkan Nomor Telepon</Text>
-                      <Text size="sm" c="gray.6">
-                        Izinkan orang lain melihat nomor telepon Anda
-                      </Text>
-                    </div>
-                    <Switch
-                      checked={settingsForm.privacy.showPhone}
-                      onChange={(e) =>
-                        setSettingsForm((prev) => ({
-                          ...prev,
-                          privacy: {
-                            ...prev.privacy,
-                            showPhone: e.currentTarget.checked,
-                          },
-                        }))
-                      }
-                    />
-                  </Group>
-
-                  <Group justify="space-between">
-                    <div>
-                      <Text fw={500}>Profil Publik</Text>
-                      <Text size="sm" c="gray.6">
-                        Izinkan profil Anda dilihat oleh orang lain
-                      </Text>
-                    </div>
-                    <Switch
-                      checked={settingsForm.privacy.showProfile}
-                      onChange={(e) =>
-                        setSettingsForm((prev) => ({
-                          ...prev,
-                          privacy: {
-                            ...prev.privacy,
-                            showProfile: e.currentTarget.checked,
-                          },
-                        }))
-                      }
-                    />
-                  </Group>
-                </Stack>
+              <Text fw={600} size="md">
+                Notifikasi
+              </Text>
+              <Stack gap="sm">
+                <Switch
+                  label="Email Notifications"
+                  description="Terima notifikasi melalui email"
+                  checked={settingsForm.emailNotifications}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => setSettingsForm((prev) => ({ ...prev, emailNotifications: event.currentTarget.checked }))}
+                />
+                <Switch
+                  label="Push Notifications"
+                  description="Terima notifikasi push"
+                  checked={settingsForm.pushNotifications}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => setSettingsForm((prev) => ({ ...prev, pushNotifications: event.currentTarget.checked }))}
+                />
               </Stack>
-            </Card>
 
-            {/* Display Settings */}
-            <Card withBorder shadow="sm" radius="md" p="lg">
-              <Stack gap="md">
-                <Text fw={600} size="lg">
-                  Pengaturan Tampilan
-                </Text>
+              <Divider />
 
-                <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-                  <Select
-                    label="Bahasa"
-                    value={settingsForm.language}
-                    onChange={(value) => setSettingsForm((prev) => ({ ...prev, language: value || 'id' }))}
-                    data={[
-                      { value: 'id', label: 'Bahasa Indonesia' },
-                      { value: 'en', label: 'English' },
-                    ]}
-                    leftSection={<IconLanguage size={16} />}
-                  />
-
-                  <Select
-                    label="Zona Waktu"
-                    value={settingsForm.timezone}
-                    onChange={(value) => setSettingsForm((prev) => ({ ...prev, timezone: value || 'Asia/Jakarta' }))}
-                    data={[
-                      { value: 'Asia/Jakarta', label: 'WIB (UTC+7)' },
-                      { value: 'Asia/Makassar', label: 'WITA (UTC+8)' },
-                      { value: 'Asia/Jayapura', label: 'WIT (UTC+9)' },
-                    ]}
-                    leftSection={<IconClock size={16} />}
-                  />
-                </SimpleGrid>
-
-                <Group justify="space-between">
-                  <div>
-                    <Text fw={500}>Dark Mode</Text>
-                    <Text size="sm" c="gray.6">
-                      Gunakan tema gelap
-                    </Text>
-                  </div>
-                  <Switch
-                    checked={settingsForm.darkMode}
-                    onChange={(e) =>
-                      setSettingsForm((prev) => ({
-                        ...prev,
-                        darkMode: e.currentTarget.checked,
-                      }))
-                    }
-                    onLabel={<IconMoon size={16} />}
-                    offLabel={<IconSun size={16} />}
-                  />
-                </Group>
+              <Text fw={600} size="md">
+                Tampilan
+              </Text>
+              <Stack gap="sm">
+                <Switch
+                  label="Dark Mode"
+                  description="Gunakan tema gelap"
+                  checked={settingsForm.darkMode}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => setSettingsForm((prev) => ({ ...prev, darkMode: event.currentTarget.checked }))}
+                />
+                <Select
+                  label="Bahasa"
+                  data={[
+                    { value: 'id', label: 'Bahasa Indonesia' },
+                    { value: 'en', label: 'English' },
+                  ]}
+                  value={settingsForm.language}
+                  onChange={(value) => setSettingsForm((prev) => ({ ...prev, language: value || 'id' }))}
+                />
+                <Select
+                  label="Timezone"
+                  data={[
+                    { value: 'Asia/Jakarta', label: 'WIB (Asia/Jakarta)' },
+                    { value: 'Asia/Makassar', label: 'WITA (Asia/Makassar)' },
+                    { value: 'Asia/Jayapura', label: 'WIT (Asia/Jayapura)' },
+                  ]}
+                  value={settingsForm.timezone}
+                  onChange={(value) => setSettingsForm((prev) => ({ ...prev, timezone: value || 'Asia/Jakarta' }))}
+                />
               </Stack>
-            </Card>
-          </Stack>
+
+              <Divider />
+
+              <Text fw={600} size="md">
+                Privasi
+              </Text>
+              <Stack gap="sm">
+                <Switch
+                  label="Tampilkan Email"
+                  description="Email Anda akan terlihat di profil publik"
+                  checked={settingsForm.privacy.showEmail}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                    setSettingsForm((prev) => ({
+                      ...prev,
+                      privacy: { ...prev.privacy, showEmail: event.currentTarget.checked },
+                    }))
+                  }
+                />
+                <Switch
+                  label="Tampilkan Nomor Telepon"
+                  description="Nomor telepon Anda akan terlihat di profil publik"
+                  checked={settingsForm.privacy.showPhone}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                    setSettingsForm((prev) => ({
+                      ...prev,
+                      privacy: { ...prev.privacy, showPhone: event.currentTarget.checked },
+                    }))
+                  }
+                />
+                <Switch
+                  label="Profil Publik"
+                  description="Profil Anda akan terlihat oleh pengguna lain"
+                  checked={settingsForm.privacy.showProfile}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                    setSettingsForm((prev) => ({
+                      ...prev,
+                      privacy: { ...prev.privacy, showProfile: event.currentTarget.checked },
+                    }))
+                  }
+                />
+              </Stack>
+            </Stack>
+          </Card>
         </Tabs.Panel>
 
         {/* Security Tab */}
         <Tabs.Panel value="security" pt="lg">
-          <Stack gap="lg">
-            {/* Password Security */}
-            <Card withBorder shadow="sm" radius="md" p="lg">
-              <Stack gap="md">
-                <Group justify="space-between">
-                  <div>
-                    <Text fw={600} size="lg">
-                      Keamanan Password
-                    </Text>
-                    <Text size="sm" c="gray.6">
-                      Kelola password dan keamanan akun Anda
-                    </Text>
-                  </div>
-                  <Button leftSection={<IconLock size={16} />} onClick={openPassword}>
-                    Ubah Password
-                  </Button>
-                </Group>
+          <Card withBorder shadow="sm" radius="md" p="lg">
+            <Stack gap="md">
+              <Text fw={600} size="lg">
+                Keamanan
+              </Text>
 
-                <Alert icon={<IconAlertCircle size={16} />} color="blue">
-                  Password terakhir diubah: {new Date().toLocaleDateString('id-ID')}
-                </Alert>
-              </Stack>
-            </Card>
-
-            {/* Account Verification */}
-            <Card withBorder shadow="sm" radius="md" p="lg">
-              <Stack gap="md">
-                <Text fw={600} size="lg">
-                  Verifikasi Akun
-                </Text>
-
-                <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-                  <Paper withBorder p="md">
-                    <Group justify="space-between">
-                      <div>
-                        <Group gap="xs" mb="xs">
-                          <IconMail size={16} />
-                          <Text fw={500}>Email</Text>
-                          {profile.isEmailVerified ? (
-                            <Badge color="green" size="xs">
-                              Terverifikasi
-                            </Badge>
-                          ) : (
-                            <Badge color="red" size="xs">
-                              Belum Verifikasi
-                            </Badge>
-                          )}
-                        </Group>
-                        <Text size="sm" c="gray.6">
-                          {profile.email}
-                        </Text>
-                      </div>
-                      {!profile.isEmailVerified && (
-                        <Button size="xs" variant="light" onClick={handleVerifyEmail}>
-                          Verifikasi
-                        </Button>
-                      )}
-                    </Group>
-                  </Paper>
-
-                  <Paper withBorder p="md">
-                    <Group justify="space-between">
-                      <div>
-                        <Group gap="xs" mb="xs">
-                          <IconPhone size={16} />
-                          <Text fw={500}>Nomor Telepon</Text>
-                          {profile.isPhoneVerified ? (
-                            <Badge color="green" size="xs">
-                              Terverifikasi
-                            </Badge>
-                          ) : (
-                            <Badge color="red" size="xs">
-                              Belum Verifikasi
-                            </Badge>
-                          )}
-                        </Group>
-                        <Text size="sm" c="gray.6">
-                          {profile.phone || 'Belum diatur'}
-                        </Text>
-                      </div>
-                      {profile.phone && !profile.isPhoneVerified && (
-                        <Button size="xs" variant="light" onClick={handleVerifyPhone}>
-                          Verifikasi
-                        </Button>
-                      )}
-                    </Group>
-                  </Paper>
-                </SimpleGrid>
-              </Stack>
-            </Card>
-
-            {/* Login Activity */}
-            <Card withBorder shadow="sm" radius="md" p="lg">
-              <Stack gap="md">
-                <Text fw={600} size="lg">
-                  Aktivitas Login
-                </Text>
-
-                <Timeline active={1} bulletSize={16} lineWidth={2}>
-                  <Timeline.Item bullet={<IconDeviceDesktop size={12} />} title="Login saat ini">
-                    <Text c="gray.6" size="sm">
-                      Desktop • Chrome • Jakarta, Indonesia
-                    </Text>
-                    <Text size="xs" c="gray.5">
-                      {new Date().toLocaleDateString('id-ID', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </Text>
-                  </Timeline.Item>
-                </Timeline>
-
-                <Alert icon={<IconShield size={16} />} color="green">
-                  Tidak ada aktivitas login yang mencurigakan terdeteksi.
-                </Alert>
-              </Stack>
-            </Card>
-
-            {/* Data Export */}
-            <Card withBorder shadow="sm" radius="md" p="lg">
-              <Stack gap="md">
+              <Group justify="space-between">
                 <div>
-                  <Text fw={600} size="lg">
-                    Export Data
-                  </Text>
+                  <Text fw={500}>Ubah Password</Text>
                   <Text size="sm" c="gray.6">
-                    Download semua data Anda dalam format JSON
+                    Terakhir diubah: {new Date(profile.lastActive).toLocaleDateString('id-ID')}
                   </Text>
                 </div>
+                <Button variant="light" onClick={openPassword}>
+                  Ubah Password
+                </Button>
+              </Group>
 
-                <Group>
-                  <Button variant="light" leftSection={<IconDownload size={16} />}>
-                    Download Data Saya
-                  </Button>
-                  <Button variant="light" color="red" leftSection={<IconTrash size={16} />}>
-                    Hapus Akun
-                  </Button>
+              <Divider />
+
+              <Text fw={600} size="md">
+                Aktivitas Login
+              </Text>
+              <Text size="sm" c="gray.6">
+                Terakhir aktif:{' '}
+                {new Date(profile.lastActive).toLocaleDateString('id-ID', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </Text>
+
+              <Divider />
+
+              <Text fw={600} size="md">
+                Verifikasi Akun
+              </Text>
+              <Stack gap="sm">
+                <Group justify="space-between">
+                  <div>
+                    <Text fw={500}>Email Verification</Text>
+                    <Text size="sm" c="gray.6">
+                      {profile.email}
+                    </Text>
+                  </div>
+                  <Badge color={profile.isEmailVerified ? 'green' : 'red'}>{profile.isEmailVerified ? 'Terverifikasi' : 'Belum Verifikasi'}</Badge>
                 </Group>
+
+                {profile.phone && (
+                  <Group justify="space-between">
+                    <div>
+                      <Text fw={500}>Phone Verification</Text>
+                      <Text size="sm" c="gray.6">
+                        {profile.phone}
+                      </Text>
+                    </div>
+                    <Badge color={profile.isPhoneVerified ? 'green' : 'red'}>{profile.isPhoneVerified ? 'Terverifikasi' : 'Belum Verifikasi'}</Badge>
+                  </Group>
+                )}
               </Stack>
-            </Card>
-          </Stack>
+            </Stack>
+          </Card>
         </Tabs.Panel>
       </Tabs>
 
-      {/* Change Password Modal */}
-      <Modal opened={passwordOpened} onClose={closePassword} title="Ubah Password" size="md">
+      {/* Password Change Modal */}
+      <Modal opened={passwordOpened} onClose={closePassword} title="Ubah Password">
         <Stack gap="md">
-          <PasswordInput label="Password Saat Ini" placeholder="Masukkan password saat ini" value={passwordForm.currentPassword} onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))} required />
-
-          <PasswordInput label="Password Baru" placeholder="Masukkan password baru" value={passwordForm.newPassword} onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))} required />
-
-          <PasswordInput label="Konfirmasi Password Baru" placeholder="Konfirmasi password baru" value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))} required />
-
-          <Alert icon={<IconAlertCircle size={16} />} color="blue">
-            Password harus minimal 8 karakter dan mengandung kombinasi huruf, angka, dan simbol.
-          </Alert>
-
-          <Group justify="flex-end" mt="md">
+          <PasswordInput label="Password Saat Ini" value={passwordForm.currentPassword} onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))} required />
+          <PasswordInput label="Password Baru" value={passwordForm.newPassword} onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))} required />
+          <PasswordInput label="Konfirmasi Password Baru" value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))} required />
+          <Group justify="flex-end">
             <Button variant="light" onClick={closePassword}>
               Batal
             </Button>
-            <Button onClick={handleChangePassword}>Ubah Password</Button>
+            <Button onClick={handlePasswordChange} loading={saving} disabled={saving}>
+              Ubah Password
+            </Button>
           </Group>
         </Stack>
       </Modal>

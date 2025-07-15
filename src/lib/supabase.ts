@@ -1,140 +1,14 @@
+// src/lib/supabase.ts - UPDATE EXISTING FILE
+// Tambahkan/update bagian ini di file yang sudah ada
+
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
-
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  password?: string;
-  role: 'USER' | 'ADMIN'; 
-  createdAt: string;
-  updateAt: string;
-  group?: string;
-  nim?: string;
-  avatar_url?: string;
-}
-
-export interface AuthUser {
-  token_balance: any;
-  tier: string;
-  monthly_token_limit: any;
-  id: string;
-  email: string;
-  name: string;
-  role: 'USER' | 'ADMIN';
-  avatar_url?: string;
-  group?: string;
-  nim?: string;
-}
-
-// New Analytics interface untuk Learning Behaviour Analysis
-export interface Analytics {
-  id: number;
-  action: string;
-  document?: string;
-  userId?: string;
-  metadata?: any; // jsonb
-  timestamp: string;
-}
-
-// Enhanced BrainstormingSession interface
-export interface BrainstormingSession {
-  id: string;
-  title: string;
-  description?: string;
-  userId: string;
-  selectedFilterArticles: string[];
-  lastSelectedNodeId?: string;
-  lastSelectedEdgeId?: string;
-  graphFilters?: any; // jsonb
-  createdAt: string;
-  updatedAt: string;
-  lastActivity: string;
-  coverColor: string;
-}
-
-// Enhanced Article interface
-export interface Article {
-  id: string;
-  title: string;
-  filePath: string;
-  createdAt: string;
-  updateAt: string; // Note: typo di schema
-  userId?: string;
-  sessionId?: string;
-  author?: User;
-}
-
-// New interfaces untuk Brain module tracking
-export interface Node {
-  id: string;
-  label: string;
-  title?: string;
-  att_goal?: string;
-  att_method?: string;
-  att_background?: string;
-  att_future?: string;
-  att_gaps?: string;
-  att_url?: string;
-  type: string;
-  content: string;
-  articleId: string;
-}
-
-export interface Edge {
-  id: string;
-  fromId: string;
-  toId: string;
-  relation?: string;
-  label?: string;
-  color?: string;
-  articleId: string;
-}
-
-export interface ChatMessage {
-  id: string;
-  sessionId: string;
-  content: string;
-  role: string;
-  createdAt: string;
-  contextEdgeIds: string[];
-  contextNodeIds: string[];
-  references?: any; // jsonb
-}
-
-// New interfaces untuk Writer module tracking
-export interface Draft {
-  id: string;
-  userId?: string;
-  title: string;
-  createdAt: string;
-}
-
-export interface DraftSection {
-  id: string;
-  draftId: string;
-  title: string;
-  content: string;
-}
-
-export interface Annotation {
-  id: string;
-  userId?: string;
-  articleId?: string;
-  page: number;
-  highlightedText: string;
-  comment: string;
-  semanticTag?: string;
-  draftSectionId?: string;
-  createdAt: string;
-}
-
-// Database types untuk Supabase
+// UPDATE: Extended Database types untuk field baru
 export type Database = {
   public: {
     Tables: {
@@ -150,6 +24,33 @@ export type Database = {
           group: string | null;
           nim: string | null;
           avatar_url: string | null;
+          // NEW FIELDS
+          phone: string | null;
+          bio: string | null;
+          address: string | null;
+          birthDate: string | null;
+          university: string | null;
+          faculty: string | null;
+          major: string | null;
+          semester: number | null;
+          linkedin: string | null;
+          github: string | null;
+          website: string | null;
+          isEmailVerified: boolean;
+          isPhoneVerified: boolean;
+          lastActive: string;
+          settings: {
+            emailNotifications: boolean;
+            pushNotifications: boolean;
+            darkMode: boolean;
+            language: string;
+            timezone: string;
+            privacy: {
+              showEmail: boolean;
+              showPhone: boolean;
+              showProfile: boolean;
+            };
+          };
         };
         Insert: {
           id?: string;
@@ -162,6 +63,22 @@ export type Database = {
           group?: string | null;
           nim?: string | null;
           avatar_url?: string | null;
+          // NEW FIELDS
+          phone?: string | null;
+          bio?: string | null;
+          address?: string | null;
+          birthDate?: string | null;
+          university?: string | null;
+          faculty?: string | null;
+          major?: string | null;
+          semester?: number | null;
+          linkedin?: string | null;
+          github?: string | null;
+          website?: string | null;
+          isEmailVerified?: boolean;
+          isPhoneVerified?: boolean;
+          lastActive?: string;
+          settings?: any; // jsonb
         };
         Update: {
           id?: string;
@@ -174,6 +91,22 @@ export type Database = {
           group?: string | null;
           nim?: string | null;
           avatar_url?: string | null;
+          // NEW FIELDS
+          phone?: string | null;
+          bio?: string | null;
+          address?: string | null;
+          birthDate?: string | null;
+          university?: string | null;
+          faculty?: string | null;
+          major?: string | null;
+          semester?: number | null;
+          linkedin?: string | null;
+          github?: string | null;
+          website?: string | null;
+          isEmailVerified?: boolean;
+          isPhoneVerified?: boolean;
+          lastActive?: string;
+          settings?: any; // jsonb
         };
       };
       Article: {
@@ -227,7 +160,139 @@ export type UserGroup = Database['public']['Tables']['User']['Row']['group'];
 export type ArticleInsert = Database['public']['Tables']['Article']['Insert'];
 export type ArticleUpdate = Database['public']['Tables']['Article']['Update'];
 
-// Helper functions untuk User
+// NEW: Extended User helper functions for profile management
+export const getUserProfile = async (userId: string) => {
+  return await supabase.from('User').select('*').eq('id', userId).single();
+};
+
+export const updateUserProfile = async (userId: string, profileData: UserUpdate) => {
+  return await supabase
+    .from('User')
+    .update({
+      ...profileData,
+      updateAt: new Date().toISOString(),
+    })
+    .eq('id', userId)
+    .select('*')
+    .single();
+};
+
+export const updateUserSettings = async (userId: string, settings: any) => {
+  return await supabase
+    .from('User')
+    .update({
+      settings,
+      updateAt: new Date().toISOString(),
+    })
+    .eq('id', userId)
+    .select('*')
+    .single();
+};
+
+export const updateLastActive = async (userId: string) => {
+  return await supabase
+    .from('User')
+    .update({
+      lastActive: new Date().toISOString(),
+    })
+    .eq('id', userId);
+};
+
+export const verifyUserEmail = async (userId: string) => {
+  return await supabase
+    .from('User')
+    .update({
+      isEmailVerified: true,
+      updateAt: new Date().toISOString(),
+    })
+    .eq('id', userId);
+};
+
+export const verifyUserPhone = async (userId: string) => {
+  return await supabase
+    .from('User')
+    .update({
+      isPhoneVerified: true,
+      updateAt: new Date().toISOString(),
+    })
+    .eq('id', userId);
+};
+
+export const uploadUserAvatar = async (userId: string, file: File) => {
+  try {
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      throw new Error('File harus berupa gambar (JPG, PNG, WEBP)');
+    }
+
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      throw new Error('Ukuran file tidak boleh lebih dari 5MB');
+    }
+
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    const fileName = `${userId}_${Date.now()}.${fileExt}`;
+    const filePath = `avatars/${fileName}`;
+
+    console.log('🚀 Starting avatar upload:', { userId, fileName, fileSize: file.size });
+
+    // Upload file to storage (tanpa auto-create bucket)
+    const { error: uploadError, data } = await supabase.storage.from('user-uploads').upload(filePath, file, {
+      upsert: true,
+      cacheControl: '3600',
+    });
+
+    if (uploadError) {
+      console.error('❌ Upload error:', uploadError);
+
+      // Better error messages
+      if (uploadError.message?.includes('not found')) {
+        throw new Error('Bucket storage belum dibuat. Silakan buat bucket "user-uploads" di Supabase Dashboard.');
+      } else if (uploadError.message?.includes('denied')) {
+        throw new Error('Akses ditolak. Pastikan bucket bersifat public dan policies sudah dikonfigurasi.');
+      } else {
+        throw new Error(`Upload gagal: ${uploadError.message}`);
+      }
+    }
+
+    console.log('✅ Upload success:', data);
+
+    // Get public URL
+    const { data: urlData } = supabase.storage.from('user-uploads').getPublicUrl(filePath);
+
+    if (!urlData?.publicUrl) {
+      throw new Error('Gagal mendapatkan URL gambar');
+    }
+
+    console.log('🔗 Public URL:', urlData.publicUrl);
+
+    // Update user avatar_url in database
+    const { data: updatedUser, error: updateError } = await supabase
+      .from('User')
+      .update({
+        avatar_url: urlData.publicUrl,
+        updateAt: new Date().toISOString(),
+      })
+      .eq('id', userId)
+      .select('*')
+      .single();
+
+    if (updateError) {
+      console.error('❌ Database update error:', updateError);
+      throw new Error(`Gagal update database: ${updateError.message}`);
+    }
+
+    console.log('✅ Database updated successfully');
+    return { data: updatedUser, error: null };
+  } catch (error: any) {
+    console.error('💥 Avatar upload error:', error);
+    return { data: null, error: error };
+  }
+};
+
+// EXISTING FUNCTIONS (keep as is)
 export const getUserByEmail = async (email: string) => {
   return await supabase.from('User').select('*').eq('email', email).single();
 };
@@ -244,7 +309,7 @@ export const getAllUsers = async () => {
   return await supabase.from('User').select('*').order('createdAt', { ascending: false });
 };
 
-// Helper functions untuk Article
+// Article functions (keep as existing)
 export const getAllArticles = async () => {
   return await supabase
     .from('Article')

@@ -3,7 +3,27 @@
 import { useEffect, useState } from 'react';
 import { Grid, Card, Text, Group, Avatar, Stack, Badge, ActionIcon, Title, SimpleGrid, Progress, RingProgress, Center, ThemeIcon, Box } from '@mantine/core';
 import { IconUsers, IconUserPlus, IconUserCheck, IconTrendingUp, IconEye, IconArrowUpRight, IconArrowDownRight, IconSchool, IconId, IconFileText, IconCalendar, IconBrain, IconPencil, IconReportAnalytics } from '@tabler/icons-react';
-import { supabase, User, Article } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
+
+// Define User and Article interfaces locally if not exported from supabase
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  group?: string;
+  nim?: string;
+  avatar_url?: string;
+  createdAt?: string;
+}
+
+interface Article {
+  id: string;
+  title: string;
+  userId: string;
+  createdAt: string;
+  author?: User;
+}
 import { useAuth } from '@/providers/auth-provider';
 import { usePageAnalytics } from '@/hooks/use-analytics';
 import { AnalyticsService } from '@/lib/analytics';

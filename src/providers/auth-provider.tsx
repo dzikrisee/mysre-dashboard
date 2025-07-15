@@ -1,22 +1,59 @@
-// =====================================
-// 1. Updated Auth Provider (src/providers/auth-provider.tsx)
-// =====================================
+// src/providers/auth-provider.tsx - UPDATE EXISTING FILE
+// Tambahkan/update bagian ini di auth provider yang sudah ada
 
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase, AuthUser } from '@/lib/supabase';
-import { LoadingOverlay } from '@mantine/core';
+import { User } from '@supabase/supabase-js';
+import { supabase, getUserProfile, updateLastActive } from '@/lib/supabase';
 import { notifications } from '@mantine/notifications';
-import { IconCheck, IconX } from '@tabler/icons-react';
+
+interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  role: 'ADMIN' | 'USER';
+  group?: string;
+  nim?: string;
+  avatar_url?: string;
+  // NEW: Additional profile fields
+  phone?: string;
+  bio?: string;
+  university?: string;
+  faculty?: string;
+  major?: string;
+  semester?: number;
+  address?: string;
+  birthDate?: string;
+  linkedin?: string;
+  github?: string;
+  website?: string;
+  isEmailVerified?: boolean;
+  isPhoneVerified?: boolean;
+  lastActive?: string;
+  settings?: {
+    emailNotifications: boolean;
+    pushNotifications: boolean;
+    darkMode: boolean;
+    language: string;
+    timezone: string;
+    privacy: {
+      showEmail: boolean;
+      showPhone: boolean;
+      showProfile: boolean;
+    };
+  };
+}
 
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  signIn: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signOut: () => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  register: (email: string, password: string, name: string) => Promise<void>;
+  updateProfile: (data: Partial<AuthUser>) => Promise<void>;
   isAdmin: () => boolean;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,190 +61,228 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
 
   useEffect(() => {
-    const getSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        await fetchUserProfile(session.user.id);
+        loadUserProfile(session.user.id);
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
-    };
+    });
 
-    getSession();
-
+    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        await fetchUserProfile(session.user.id);
-
-        // Record login analytics
-        await recordLoginAnalytics(session.user.id);
-
-        const { data: userData } = await supabase.from('User').select('role').eq('id', session.user.id).single();
-
-        if (userData?.role === 'ADMIN') {
-          // Updated ke ADMIN
-          router.push('/dashboard');
-        } else {
-          await supabase.auth.signOut();
-          notifications.show({
-            title: 'Akses Ditolak',
-            message: 'Hanya administrator yang dapat mengakses dashboard',
-            color: 'red',
-            icon: <IconX size={16} />,
-          });
-        }
+        await loadUserProfile(session.user.id);
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
-        router.push('/auth');
+        setLoading(false);
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const recordLoginAnalytics = async (userId: string) => {
+  const loadUserProfile = async (userId: string) => {
     try {
-      await supabase.from('analytics').insert({
-        action: 'login',
-        userId,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          userAgent: navigator.userAgent,
-          platform: navigator.platform,
-        },
-      });
-    } catch (error) {
-      console.error('Failed to record login analytics:', error);
-    }
-  };
+      const { data: profile, error } = await getUserProfile(userId);
 
-  const fetchUserProfile = async (userId: string) => {
-    const { data, error } = await supabase.from('User').select('*').eq('id', userId).single();
-
-    if (data && !error) {
-      setUser({
-        id: data.id,
-        email: data.email,
-        name: data.name,
-        role: data.role,
-        avatar_url: data.avatar_url,
-        group: data.group,
-        nim: data.nim,
-      });
-    }
-  };
-
-  const signIn = async (identifier: string, password: string) => {
-    try {
-      let email = identifier;
-
-      // Jika identifier bukan email, cari email berdasarkan NIM
-      if (!identifier.includes('@')) {
-        const { data: userData, error: userError } = await supabase.from('User').select('email').eq('nim', identifier).single();
-
-        if (userError || !userData) {
-          notifications.show({
-            title: 'Error',
-            message: 'NIM tidak ditemukan',
-            color: 'red',
-            icon: <IconX size={16} />,
-          });
-          return { success: false, error: 'NIM tidak ditemukan' };
-        }
-
-        email = userData.email;
+      if (error) {
+        throw error;
       }
 
+      if (profile) {
+        // Update last active
+        await updateLastActive(userId);
+
+        // Map database user to AuthUser
+        const authUser: AuthUser = {
+          id: profile.id,
+          email: profile.email,
+          name: profile.name,
+          role: profile.role,
+          group: profile.group || undefined,
+          nim: profile.nim || undefined,
+          avatar_url: profile.avatar_url || undefined,
+          phone: profile.phone || undefined,
+          bio: profile.bio || undefined,
+          university: profile.university || undefined,
+          faculty: profile.faculty || undefined,
+          major: profile.major || undefined,
+          semester: profile.semester || undefined,
+          address: profile.address || undefined,
+          birthDate: profile.birthDate || undefined,
+          linkedin: profile.linkedin || undefined,
+          github: profile.github || undefined,
+          website: profile.website || undefined,
+          isEmailVerified: profile.isEmailVerified,
+          isPhoneVerified: profile.isPhoneVerified,
+          lastActive: profile.lastActive,
+          settings: profile.settings || {
+            emailNotifications: true,
+            pushNotifications: true,
+            darkMode: false,
+            language: 'id',
+            timezone: 'Asia/Jakarta',
+            privacy: {
+              showEmail: false,
+              showPhone: false,
+              showProfile: true,
+            },
+          },
+        };
+
+        setUser(authUser);
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Gagal memuat profil pengguna',
+        color: 'red',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async (email: string, password: string) => {
+    try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
-        notifications.show({
-          title: 'Error',
-          message: 'Email/NIM atau password salah',
-          color: 'red',
-          icon: <IconX size={16} />,
-        });
-        return { success: false, error: error.message };
+        throw error;
       }
 
       if (data.user) {
-        const { data: userData, error: userError } = await supabase.from('User').select('*').eq('id', data.user.id).single();
-
-        if (userError || !userData || userData.role !== 'ADMIN') {
-          // Updated ke ADMIN
-          await supabase.auth.signOut();
-          notifications.show({
-            title: 'Akses Ditolak',
-            message: 'Hanya administrator yang dapat mengakses dashboard',
-            color: 'red',
-            icon: <IconX size={16} />,
-          });
-          return { success: false, error: 'Akses ditolak' };
-        }
-
-        notifications.show({
-          title: 'Berhasil',
-          message: `Selamat datang, ${userData.name}!`,
-          color: 'green',
-          icon: <IconCheck size={16} />,
-        });
-
-        setTimeout(() => {
-          router.push('/dashboard');
-        }, 1000);
+        await loadUserProfile(data.user.id);
       }
-
-      return { success: true };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Terjadi kesalahan';
-      notifications.show({
-        title: 'Error',
-        message,
-        color: 'red',
-        icon: <IconX size={16} />,
-      });
-      return { success: false, error: message };
+    } catch (error: any) {
+      console.error('Login error:', error);
+      throw new Error(error.message || 'Gagal login');
     }
   };
 
-  const signOut = async () => {
-    // Record logout analytics
-    if (user) {
-      try {
-        await supabase.from('analytics').insert({
-          action: 'logout',
-          userId: user.id,
-          metadata: { timestamp: new Date().toISOString() },
-        });
-      } catch (error) {
-        console.error('Failed to record logout analytics:', error);
-      }
-    }
+  const register = async (email: string, password: string, name: string) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
 
-    await supabase.auth.signOut();
-    setUser(null);
-    router.push('/auth');
+      if (error) {
+        throw error;
+      }
+
+      if (data.user) {
+        // Create user profile in database
+        const { error: insertError } = await supabase.from('User').insert({
+          id: data.user.id,
+          email,
+          name,
+          role: 'USER',
+          isEmailVerified: false,
+          isPhoneVerified: false,
+          lastActive: new Date().toISOString(),
+          settings: {
+            emailNotifications: true,
+            pushNotifications: true,
+            darkMode: false,
+            language: 'id',
+            timezone: 'Asia/Jakarta',
+            privacy: {
+              showEmail: false,
+              showPhone: false,
+              showProfile: true,
+            },
+          },
+        });
+
+        if (insertError) {
+          throw insertError;
+        }
+
+        await loadUserProfile(data.user.id);
+      }
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      throw new Error(error.message || 'Gagal mendaftar');
+    }
+  };
+
+  const updateProfile = async (data: Partial<AuthUser>) => {
+    if (!user) return;
+
+    try {
+      const { data: updatedProfile, error } = await supabase
+        .from('User')
+        .update({
+          ...data,
+          updateAt: new Date().toISOString(),
+        })
+        .eq('id', user.id)
+        .select('*')
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      if (updatedProfile) {
+        await loadUserProfile(user.id);
+      }
+    } catch (error: any) {
+      console.error('Update profile error:', error);
+      throw new Error(error.message || 'Gagal memperbarui profil');
+    }
+  };
+
+  const refreshUser = async () => {
+    if (!user?.id) return;
+
+    try {
+      await loadUserProfile(user.id);
+    } catch (error) {
+      console.error('Error refreshing user:', error);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        throw error;
+      }
+      setUser(null);
+    } catch (error: any) {
+      console.error('Logout error:', error);
+      throw new Error(error.message || 'Gagal logout');
+    }
   };
 
   const isAdmin = () => {
-    return user?.role === 'ADMIN'; // Updated ke ADMIN
+    return user?.role === 'ADMIN';
   };
 
-  if (loading) {
-    return <LoadingOverlay visible />;
-  }
+  const value: AuthContextType = {
+    user,
+    loading,
+    login,
+    logout,
+    register,
+    updateProfile,
+    isAdmin,
+    refreshUser,
+  };
 
-  return <AuthContext.Provider value={{ user, loading, signIn, signOut, isAdmin }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
@@ -217,88 +292,3 @@ export function useAuth() {
   }
   return context;
 }
-
-
-
-// =====================================
-// 3. Detailed User Analytics Component
-// =====================================
-
-
-
-// =====================================
-// 4. Updated Dashboard Layout Navigation (src/components/layout/dashboard-layout.tsx)
-// =====================================
-
-
-
-
-
-// =====================================
-// 7. Example Usage dalam komponen Brain Module
-// =====================================
-
-// Di dalam komponen Node onClick handler:
-/*
-const handleNodeClick = (node: Node) => {
-  // Existing logic...
-  
-  // Track analytics
-  if (user?.id) {
-    AnalyticsTracker.trackNodeClick(user.id, node.id, node.type, node.articleId);
-  }
-};
-
-const handleEdgeClick = (edge: Edge) => {
-  // Existing logic...
-  
-  // Track analytics
-  if (user?.id) {
-    AnalyticsTracker.trackEdgeClick(user.id, edge.id, edge.relation || 'unknown', edge.articleId);
-  }
-};
-
-const handleChatSubmit = async (query: string) => {
-  // Send chat and get response
-  const response = await sendChatMessage(query);
-  
-  // Track analytics
-  if (user?.id && session?.id) {
-    AnalyticsTracker.trackChatQuery(user.id, session.id, query, response.length);
-  }
-};
-*/
-
-// =====================================
-// 8. Example Usage dalam komponen Writer Module
-// =====================================
-
-/*
-const handleDraftSave = async (draftData: any) => {
-  // Save draft logic...
-  const wordCount = calculateWordCount(draftData.content);
-  
-  // Track analytics
-  if (user?.id && draftId) {
-    AnalyticsTracker.trackDraftSave(user.id, draftId, wordCount);
-  }
-};
-
-const handleAnnotationAdd = async (annotation: any) => {
-  // Add annotation logic...
-  
-  // Track analytics
-  if (user?.id && articleId) {
-    AnalyticsTracker.trackAnnotationCreate(user.id, articleId, annotation.semanticTag || 'general');
-  }
-};
-
-const handleAIAssistance = async (prompt: string, type: string) => {
-  // AI assistance logic...
-  
-  // Track analytics
-  if (user?.id && currentDocument) {
-    AnalyticsTracker.trackAIAssistance(user.id, currentDocument.id, type, prompt.length);
-  }
-};
-*/
