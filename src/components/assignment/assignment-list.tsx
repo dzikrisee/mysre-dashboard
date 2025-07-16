@@ -7,6 +7,7 @@ import { IconSearch, IconFilter, IconDots, IconEye, IconEdit, IconTrash, IconDow
 import { Assignment } from '@/lib/types/assignment';
 import { AssignmentService } from '@/lib/services/assignment.service';
 import { notifications } from '@mantine/notifications';
+import { useRouter } from 'next/navigation';
 
 interface AssignmentListProps {
   assignments: Assignment[];
@@ -16,6 +17,7 @@ interface AssignmentListProps {
 }
 
 export function AssignmentList({ assignments, onEdit, onDelete, onRefresh }: AssignmentListProps) {
+  const router = useRouter(); // Tambahkan ini
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [weekFilter, setWeekFilter] = useState<string>('all');
@@ -242,8 +244,8 @@ export function AssignmentList({ assignments, onEdit, onDelete, onRefresh }: Ass
                           <Menu.Item
                             leftSection={<IconEye size={16} />}
                             onClick={() => {
-                              // Navigate to assignment detail/submissions
-                              window.location.href = `/dashboard/assignments/${assignment.id}`;
+                              // GANTI dari window.location.href ke router.push
+                              router.push(`/dashboard/assignments/${assignment.id}`);
                             }}
                           >
                             Lihat Detail
@@ -251,8 +253,8 @@ export function AssignmentList({ assignments, onEdit, onDelete, onRefresh }: Ass
                           <Menu.Item
                             leftSection={<IconUsers size={16} />}
                             onClick={() => {
-                              // Navigate to submissions for this assignment
-                              window.location.href = `/dashboard/assignments/${assignment.id}/submissions`;
+                              // GANTI dari window.location.href ke router.push
+                              router.push(`/dashboard/assignments/${assignment.id}?tab=submissions`);
                             }}
                           >
                             Lihat Submission

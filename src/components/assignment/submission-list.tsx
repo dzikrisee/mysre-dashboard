@@ -1,4 +1,4 @@
-// src/components/assignments/submission-list.tsx
+// src/components/assignment/submission-list.tsx - FIXED VERSION
 'use client';
 
 import { useState } from 'react';
@@ -79,6 +79,39 @@ export function SubmissionList({ submissions, onRefresh }: SubmissionListProps) 
     }
   };
 
+  // Get status label and color
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'Pending';
+      case 'submitted':
+        return 'Dikumpulkan';
+      case 'graded':
+        return 'Dinilai';
+      default:
+        return status;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'gray';
+      case 'submitted':
+        return 'blue';
+      case 'graded':
+        return 'green';
+      default:
+        return 'gray';
+    }
+  };
+
+  // Get unique assignments for filter
+  const availableAssignments = Array.from(new Set(submissions.map((s) => s.assignment?.title).filter(Boolean))).map((title) => ({
+    value: title!,
+    label: title!,
+  }));
+
   // Filter submissions
   const filteredSubmissions = submissions.filter((submission) => {
     const matchesSearch =
@@ -89,70 +122,17 @@ export function SubmissionList({ submissions, onRefresh }: SubmissionListProps) 
 
     const matchesStatus = statusFilter === 'all' || submission.status === statusFilter;
 
-    const matchesAssignment = assignmentFilter === 'all' || submission.assignment_id === assignmentFilter;
+    const matchesAssignment = assignmentFilter === 'all' || submission.assignment?.title === assignmentFilter;
 
     return matchesSearch && matchesStatus && matchesAssignment;
   });
-
-  // Get unique assignments for filter
-  const availableAssignments = Array.from(new Set(submissions.map((s) => s.assignment_id))).map((id) => {
-    const submission = submissions.find((s) => s.assignment_id === id);
-    return {
-      value: id,
-      label: submission?.assignment?.title || 'Unknown Assignment',
-    };
-  });
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'graded':
-        return 'green';
-      case 'submitted':
-        return 'blue';
-      case 'pending':
-        return 'gray';
-      default:
-        return 'gray';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'graded':
-        return 'Dinilai';
-      case 'submitted':
-        return 'Dikumpulkan';
-      case 'pending':
-        return 'Pending';
-      default:
-        return status;
-    }
-  };
-
-  if (submissions.length === 0) {
-    return (
-      <Card withBorder shadow="sm" radius="md" p="xl">
-        <Stack align="center" gap="md">
-          <IconFile size={48} color="var(--mantine-color-gray-4)" />
-          <div style={{ textAlign: 'center' }}>
-            <Text fw={600} size="lg" mb={4}>
-              Belum Ada Submission
-            </Text>
-            <Text c="gray.6" size="sm">
-              Submission akan muncul ketika mahasiswa mulai mengumpulkan tugas
-            </Text>
-          </div>
-        </Stack>
-      </Card>
-    );
-  }
 
   return (
     <Stack gap="md">
       {/* Filters */}
       <Paper withBorder shadow="sm" radius="md" p="md">
-        <Group>
-          <TextInput placeholder="Cari mahasiswa, NIM, atau assignment..." leftSection={<IconSearch size={16} />} value={search} onChange={(e) => setSearch(e.target.value)} style={{ flex: 1 }} />
+        <Group gap="md">
+          <TextInput placeholder="Cari mahasiswa, assignment, atau code..." leftSection={<IconSearch size={16} />} value={search} onChange={(e) => setSearch(e.target.value)} style={{ flex: 1 }} />
           <Select
             placeholder="Status"
             leftSection={<IconFilter size={16} />}
@@ -263,7 +243,7 @@ export function SubmissionList({ submissions, onRefresh }: SubmissionListProps) 
                     </Group>
                   </Table.Td>
                   <Table.Td>
-                    {submission.grade !== null ? (
+                    {submission.grade !== null && submission.grade !== undefined ? (
                       <Badge size="sm" color={submission.grade >= 80 ? 'green' : submission.grade >= 60 ? 'orange' : 'red'} variant="light">
                         {submission.grade}
                       </Badge>
@@ -311,7 +291,7 @@ export function SubmissionList({ submissions, onRefresh }: SubmissionListProps) 
                           )}
                           {submission.status !== 'pending' && (
                             <Menu.Item leftSection={<IconStar size={16} />} onClick={() => openGradingModal(submission)}>
-                              {submission.grade !== null ? 'Edit Nilai' : 'Beri Nilai'}
+                              {submission.grade !== null && submission.grade !== undefined ? 'Edit Nilai' : 'Beri Nilai'}
                             </Menu.Item>
                           )}
                         </Menu.Dropdown>
@@ -332,46 +312,60 @@ export function SubmissionList({ submissions, onRefresh }: SubmissionListProps) 
       </Paper>
 
       {/* Grading Modal */}
-      <Modal opened={!!gradingModal} onClose={() => setGradingModal(null)} title="Penilaian Submission" size="md">
+      <Modal opened={!!gradingModal} onClose={() => setGradingModal(null)} title="Beri Nilai Submission" size="md">
         {gradingModal && (
-          <form onSubmit={gradingForm.onSubmit(handleGradeSubmission)}>
-            <Stack gap="md">
-              {/* Submission Info */}
-              <Alert icon={<IconCheck size={16} />} color="blue" variant="light">
-                <Text fw={500} size="sm" mb={4}>
-                  Submission Details
-                </Text>
-                <Text size="sm">
-                  <strong>Mahasiswa:</strong> {gradingModal.student?.name} ({gradingModal.student?.nim})
-                </Text>
-                <Text size="sm">
-                  <strong>Assignment:</strong> {gradingModal.assignment?.title}
-                </Text>
-                <Text size="sm">
-                  <strong>Code Input:</strong> {gradingModal.assignment_code_input}
-                </Text>
-                {gradingModal.file_url && (
-                  <Anchor size="sm" onClick={() => downloadFile(gradingModal)}>
-                    Download File Submission
-                  </Anchor>
-                )}
-              </Alert>
+          <Stack gap="md">
+            <Alert icon={<IconUser size={16} />} color="blue" variant="light">
+              <Text fw={500}>{gradingModal.student?.name}</Text>
+              <Text size="sm" c="gray.6">
+                {gradingModal.assignment?.title} - {gradingModal.assignment_code_input}
+              </Text>
+            </Alert>
 
-              {/* Grading Form */}
-              <NumberInput label="Nilai (0-100)" placeholder="Masukkan nilai..." required min={0} max={100} {...gradingForm.getInputProps('grade')} />
+            {gradingModal.submission_text && (
+              <div>
+                <Text fw={500} size="sm" mb="xs">
+                  Teks Submission:
+                </Text>
+                <Paper withBorder p="md" radius="md" bg="gray.0">
+                  <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                    {gradingModal.submission_text}
+                  </Text>
+                </Paper>
+              </div>
+            )}
 
-              <Textarea label="Feedback (Opsional)" placeholder="Berikan feedback untuk mahasiswa..." minRows={3} maxRows={6} autosize {...gradingForm.getInputProps('feedback')} />
+            {gradingModal.file_url && (
+              <div>
+                <Text fw={500} size="sm" mb="xs">
+                  File:
+                </Text>
+                <Anchor href={gradingModal.file_url} target="_blank" size="sm">
+                  <Group gap="xs">
+                    <IconFile size={16} />
+                    {gradingModal.file_name || 'Download File'}
+                  </Group>
+                </Anchor>
+              </div>
+            )}
 
-              <Group justify="flex-end">
-                <Button variant="light" onClick={() => setGradingModal(null)} disabled={loading}>
-                  Batal
-                </Button>
-                <Button type="submit" loading={loading}>
-                  Simpan Nilai
-                </Button>
-              </Group>
-            </Stack>
-          </form>
+            <form onSubmit={gradingForm.onSubmit(handleGradeSubmission)}>
+              <Stack gap="md">
+                <NumberInput label="Nilai (0-100)" placeholder="Masukkan nilai..." required min={0} max={100} {...gradingForm.getInputProps('grade')} />
+
+                <Textarea label="Feedback (Opsional)" placeholder="Berikan feedback untuk mahasiswa..." minRows={3} maxRows={6} autosize {...gradingForm.getInputProps('feedback')} />
+
+                <Group justify="flex-end">
+                  <Button variant="light" onClick={() => setGradingModal(null)} disabled={loading}>
+                    Batal
+                  </Button>
+                  <Button type="submit" loading={loading}>
+                    Simpan Nilai
+                  </Button>
+                </Group>
+              </Stack>
+            </form>
+          </Stack>
         )}
       </Modal>
     </Stack>

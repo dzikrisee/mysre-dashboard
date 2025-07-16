@@ -1,4 +1,4 @@
-// src/components/assignments/assignment-form.tsx
+// src/components/assignment/assignment-form.tsx - FIXED VERSION
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -117,6 +117,40 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
     }
   };
 
+  // FIXED: Safe date handling function
+  const formatDueDate = (date: any): string | null => {
+    if (!date) return null;
+
+    try {
+      // If it's already a Date object
+      if (date instanceof Date) {
+        return date.toISOString();
+      }
+
+      // If it's a string, try to convert to Date
+      if (typeof date === 'string') {
+        const dateObj = new Date(date);
+        if (!isNaN(dateObj.getTime())) {
+          return dateObj.toISOString();
+        }
+      }
+
+      // If it's a timestamp number
+      if (typeof date === 'number') {
+        const dateObj = new Date(date);
+        if (!isNaN(dateObj.getTime())) {
+          return dateObj.toISOString();
+        }
+      }
+
+      console.warn('Invalid date format:', date);
+      return null;
+    } catch (error) {
+      console.error('Date formatting error:', error);
+      return null;
+    }
+  };
+
   const handleSubmit = async (values: typeof form.values) => {
     if (codeError) {
       notifications.show({
@@ -138,12 +172,19 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
         if (uploadResult) {
           fileUrl = uploadResult.url;
           fileName = uploadResult.name;
+        } else {
+          // If upload failed, stop the process
+          setLoading(false);
+          return;
         }
       }
 
+      // FIXED: Safe due_date handling
+      const formattedDueDate = formatDueDate(values.due_date);
+
       const data = {
         ...values,
-        due_date: values.due_date?.toISOString() || null,
+        due_date: formattedDueDate,
         file_url: fileUrl,
         file_name: fileName,
         created_by: user?.id || '',
@@ -243,7 +284,7 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
             <Button variant="light" onClick={onCancel} disabled={loading || uploadingFile}>
               Batal
             </Button>
-            <Button type="submit" loading={loading || uploadingFile} disabled={!!codeError}>
+            <Button type="submit" loading={loading || uploadingFile} disabled={!form.isValid() || codeError !== null}>
               {assignment ? 'Update Assignment' : 'Buat Assignment'}
             </Button>
           </Group>

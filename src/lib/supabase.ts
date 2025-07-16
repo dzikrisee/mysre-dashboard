@@ -1,15 +1,10 @@
-// src/lib/supabase.ts - UPDATE EXISTING FILE
-// Tambahkan/update bagian ini di file yang sudah ada
-
+// src/lib/supabase.ts - UPDATED VERSION with Assignment Tables
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
-
-// UPDATE: Extended Database types untuk field baru
-export type Database = {
+export interface Database {
   public: {
     Tables: {
       User: {
@@ -17,96 +12,82 @@ export type Database = {
           id: string;
           email: string;
           name: string;
-          password: string | null;
-          role: 'USER' | 'ADMIN';
-          createdAt: string;
-          updateAt: string;
+          role: 'ADMIN' | 'USER';
+          avatar_url: string | null;
           group: string | null;
           nim: string | null;
-          avatar_url: string | null;
-          // NEW FIELDS
           phone: string | null;
           bio: string | null;
-          address: string | null;
-          birthDate: string | null;
           university: string | null;
           faculty: string | null;
           major: string | null;
           semester: number | null;
+          address: string | null;
+          birthDate: string | null;
           linkedin: string | null;
           github: string | null;
           website: string | null;
           isEmailVerified: boolean;
           isPhoneVerified: boolean;
-          lastActive: string;
-          settings: {
-            emailNotifications: boolean;
-            pushNotifications: boolean;
-            darkMode: boolean;
-            language: string;
-            timezone: string;
-            privacy: {
-              showEmail: boolean;
-              showPhone: boolean;
-              showProfile: boolean;
-            };
-          };
+          lastActive: string | null;
+          token_balance: number;
+          settings: any;
+          createdAt: string;
+          updateAt: string;
         };
         Insert: {
-          id?: string;
+          id: string;
           email: string;
           name: string;
-          password?: string | null;
-          role?: 'USER' | 'ADMIN';
-          createdAt?: string;
-          updateAt?: string;
+          role?: 'ADMIN' | 'USER';
+          avatar_url?: string | null;
           group?: string | null;
           nim?: string | null;
-          avatar_url?: string | null;
-          // NEW FIELDS
           phone?: string | null;
           bio?: string | null;
-          address?: string | null;
-          birthDate?: string | null;
           university?: string | null;
           faculty?: string | null;
           major?: string | null;
           semester?: number | null;
+          address?: string | null;
+          birthDate?: string | null;
           linkedin?: string | null;
           github?: string | null;
           website?: string | null;
           isEmailVerified?: boolean;
           isPhoneVerified?: boolean;
-          lastActive?: string;
-          settings?: any; // jsonb
+          lastActive?: string | null;
+          token_balance?: number;
+          settings?: any;
+          createdAt?: string;
+          updateAt?: string;
         };
         Update: {
           id?: string;
           email?: string;
           name?: string;
-          password?: string | null;
-          role?: 'USER' | 'ADMIN';
-          createdAt?: string;
-          updateAt?: string;
+          role?: 'ADMIN' | 'USER';
+          avatar_url?: string | null;
           group?: string | null;
           nim?: string | null;
-          avatar_url?: string | null;
-          // NEW FIELDS
           phone?: string | null;
           bio?: string | null;
-          address?: string | null;
-          birthDate?: string | null;
           university?: string | null;
           faculty?: string | null;
           major?: string | null;
           semester?: number | null;
+          address?: string | null;
+          birthDate?: string | null;
           linkedin?: string | null;
           github?: string | null;
           website?: string | null;
           isEmailVerified?: boolean;
           isPhoneVerified?: boolean;
-          lastActive?: string;
-          settings?: any; // jsonb
+          lastActive?: string | null;
+          token_balance?: number;
+          settings?: any;
+          createdAt?: string;
+          updateAt?: string;
         };
       };
       Article: {
@@ -120,7 +101,7 @@ export type Database = {
           sessionId: string | null;
         };
         Insert: {
-          id: string;
+          id?: string;
           title: string;
           filePath: string;
           createdAt?: string;
@@ -138,6 +119,101 @@ export type Database = {
           sessionId?: string | null;
         };
       };
+      // NEW ASSIGNMENT TABLES
+      Assignment: {
+        Row: {
+          id: string;
+          title: string;
+          description: string;
+          week_number: number;
+          assignment_code: string;
+          file_url: string | null;
+          file_name: string | null;
+          due_date: string | null;
+          is_active: boolean;
+          created_by: string;
+          createdAt: string;
+          updatedAt: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description: string;
+          week_number: number;
+          assignment_code: string;
+          file_url?: string | null;
+          file_name?: string | null;
+          due_date?: string | null;
+          is_active?: boolean;
+          created_by: string;
+          createdAt?: string;
+          updatedAt?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          description?: string;
+          week_number?: number;
+          assignment_code?: string;
+          file_url?: string | null;
+          file_name?: string | null;
+          due_date?: string | null;
+          is_active?: boolean;
+          created_by?: string;
+          createdAt?: string;
+          updatedAt?: string;
+        };
+      };
+      AssignmentSubmission: {
+        Row: {
+          id: string;
+          assignment_id: string;
+          student_id: string;
+          assignment_code_input: string;
+          file_url: string | null;
+          file_name: string | null;
+          submission_text: string | null;
+          status: 'pending' | 'submitted' | 'graded';
+          grade: number | null;
+          feedback: string | null;
+          submitted_at: string;
+          graded_at: string | null;
+          createdAt: string;
+          updatedAt: string;
+        };
+        Insert: {
+          id?: string;
+          assignment_id: string;
+          student_id: string;
+          assignment_code_input: string;
+          file_url?: string | null;
+          file_name?: string | null;
+          submission_text?: string | null;
+          status?: 'pending' | 'submitted' | 'graded';
+          grade?: number | null;
+          feedback?: string | null;
+          submitted_at?: string;
+          graded_at?: string | null;
+          createdAt?: string;
+          updatedAt?: string;
+        };
+        Update: {
+          id?: string;
+          assignment_id?: string;
+          student_id?: string;
+          assignment_code_input?: string;
+          file_url?: string | null;
+          file_name?: string | null;
+          submission_text?: string | null;
+          status?: 'pending' | 'submitted' | 'graded';
+          grade?: number | null;
+          feedback?: string | null;
+          submitted_at?: string;
+          graded_at?: string | null;
+          createdAt?: string;
+          updatedAt?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;
@@ -149,7 +225,9 @@ export type Database = {
       [_ in never]: never;
     };
   };
-};
+}
+
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
 // Helper types
 export type UserRole = Database['public']['Tables']['User']['Row']['role'];
@@ -160,7 +238,16 @@ export type UserGroup = Database['public']['Tables']['User']['Row']['group'];
 export type ArticleInsert = Database['public']['Tables']['Article']['Insert'];
 export type ArticleUpdate = Database['public']['Tables']['Article']['Update'];
 
-// NEW: Extended User helper functions for profile management
+// NEW: Assignment helper types
+export type AssignmentRow = Database['public']['Tables']['Assignment']['Row'];
+export type AssignmentInsert = Database['public']['Tables']['Assignment']['Insert'];
+export type AssignmentUpdate = Database['public']['Tables']['Assignment']['Update'];
+
+export type AssignmentSubmissionRow = Database['public']['Tables']['AssignmentSubmission']['Row'];
+export type AssignmentSubmissionInsert = Database['public']['Tables']['AssignmentSubmission']['Insert'];
+export type AssignmentSubmissionUpdate = Database['public']['Tables']['AssignmentSubmission']['Update'];
+
+// Existing User helper functions
 export const getUserProfile = async (userId: string) => {
   return await supabase.from('User').select('*').eq('id', userId).single();
 };
@@ -232,44 +319,22 @@ export const uploadUserAvatar = async (userId: string, file: File) => {
       throw new Error('Ukuran file tidak boleh lebih dari 5MB');
     }
 
-    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    const fileExt = file.name.split('.').pop();
     const fileName = `${userId}_${Date.now()}.${fileExt}`;
     const filePath = `avatars/${fileName}`;
 
-    console.log('🚀 Starting avatar upload:', { userId, fileName, fileSize: file.size });
-
-    // Upload file to storage (tanpa auto-create bucket)
-    const { error: uploadError, data } = await supabase.storage.from('user-uploads').upload(filePath, file, {
+    // Upload file to storage
+    const { data: uploadData, error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file, {
       upsert: true,
-      cacheControl: '3600',
     });
 
-    if (uploadError) {
-      console.error('❌ Upload error:', uploadError);
-
-      // Better error messages
-      if (uploadError.message?.includes('not found')) {
-        throw new Error('Bucket storage belum dibuat. Silakan buat bucket "user-uploads" di Supabase Dashboard.');
-      } else if (uploadError.message?.includes('denied')) {
-        throw new Error('Akses ditolak. Pastikan bucket bersifat public dan policies sudah dikonfigurasi.');
-      } else {
-        throw new Error(`Upload gagal: ${uploadError.message}`);
-      }
-    }
-
-    console.log('✅ Upload success:', data);
+    if (uploadError) throw uploadError;
 
     // Get public URL
-    const { data: urlData } = supabase.storage.from('user-uploads').getPublicUrl(filePath);
+    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
 
-    if (!urlData?.publicUrl) {
-      throw new Error('Gagal mendapatkan URL gambar');
-    }
-
-    console.log('🔗 Public URL:', urlData.publicUrl);
-
-    // Update user avatar_url in database
-    const { data: updatedUser, error: updateError } = await supabase
+    // Update user profile with new avatar URL
+    const { data: updateData, error: updateError } = await supabase
       .from('User')
       .update({
         avatar_url: urlData.publicUrl,
@@ -279,89 +344,151 @@ export const uploadUserAvatar = async (userId: string, file: File) => {
       .select('*')
       .single();
 
-    if (updateError) {
-      console.error('❌ Database update error:', updateError);
-      throw new Error(`Gagal update database: ${updateError.message}`);
-    }
+    if (updateError) throw updateError;
 
-    console.log('✅ Database updated successfully');
-    return { data: updatedUser, error: null };
+    return { data: updateData, error: null };
   } catch (error: any) {
-    console.error('💥 Avatar upload error:', error);
-    return { data: null, error: error };
+    console.error('Avatar upload error:', error);
+    return { data: null, error: error.message };
   }
 };
 
-// EXISTING FUNCTIONS (keep as is)
-export const getUserByEmail = async (email: string) => {
-  return await supabase.from('User').select('*').eq('email', email).single();
-};
-
-export const getUserByNim = async (nim: string) => {
-  return await supabase.from('User').select('*').eq('nim', nim).single();
-};
-
-export const getUsersByGroup = async (group: string) => {
-  return await supabase.from('User').select('*').eq('group', group).order('name');
-};
-
-export const getAllUsers = async () => {
-  return await supabase.from('User').select('*').order('createdAt', { ascending: false });
-};
-
-// Article functions (keep as existing)
-export const getAllArticles = async () => {
+// NEW: Assignment helper functions
+export const createAssignment = async (assignment: AssignmentInsert) => {
   return await supabase
-    .from('Article')
-    .select(
-      `
-      *,
-      author:User!Article_userId_fkey(id, name, email, role, group, nim)
-    `,
-    )
-    .order('createdAt', { ascending: false });
-};
-
-export const getArticlesByUser = async (userId: string) => {
-  return await supabase
-    .from('Article')
-    .select(
-      `
-      *,
-      author:User!Article_userId_fkey(id, name, email, role, group, nim)
-    `,
-    )
-    .eq('userId', userId)
-    .order('createdAt', { ascending: false });
-};
-
-export const createArticle = async (articleData: ArticleInsert) => {
-  return await supabase
-    .from('Article')
-    .insert(articleData)
-    .select(
-      `
-      *,
-      author:User!Article_userId_fkey(id, name, email, role, group, nim)
-    `,
-    )
+    .from('Assignment')
+    .insert({
+      ...assignment,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
+    .select('*')
     .single();
 };
 
-export const updateArticle = async (id: string, articleData: ArticleUpdate) => {
+export const getAssignments = async () => {
   return await supabase
-    .from('Article')
-    .update(articleData)
+    .from('Assignment')
+    .select(
+      `
+      *,
+      creator:User!Assignment_created_by_fkey(id, name, email)
+    `,
+    )
+    .order('week_number', { ascending: true });
+};
+
+export const getActiveAssignments = async () => {
+  return await supabase
+    .from('Assignment')
+    .select(
+      `
+      *,
+      creator:User!Assignment_created_by_fkey(id, name, email)
+    `,
+    )
+    .eq('is_active', true)
+    .order('week_number', { ascending: true });
+};
+
+export const updateAssignment = async (id: string, assignment: AssignmentUpdate) => {
+  return await supabase
+    .from('Assignment')
+    .update({
+      ...assignment,
+      updatedAt: new Date().toISOString(),
+    })
     .eq('id', id)
-    .select(
-      `
-      *,
-      author:User!Article_userId_fkey(id, name, email, role, group, nim)
-    `,
-    )
+    .select('*')
     .single();
 };
 
-export const deleteArticle = async (id: string) => {
-  return await supabase.from('Article').delete().eq('id', id);
+export const deleteAssignment = async (id: string) => {
+  return await supabase.from('Assignment').delete().eq('id', id);
+};
+
+// NEW: Assignment Submission helper functions
+export const createSubmission = async (submission: AssignmentSubmissionInsert) => {
+  return await supabase
+    .from('AssignmentSubmission')
+    .insert({
+      ...submission,
+      submitted_at: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
+    .select('*')
+    .single();
+};
+
+export const getSubmissions = async () => {
+  return await supabase
+    .from('AssignmentSubmission')
+    .select(
+      `
+      *,
+      assignment:Assignment(id, title, week_number, assignment_code),
+      student:User!AssignmentSubmission_student_id_fkey(id, name, nim, group, email)
+    `,
+    )
+    .order('submitted_at', { ascending: false });
+};
+
+export const updateSubmission = async (id: string, submission: AssignmentSubmissionUpdate) => {
+  return await supabase
+    .from('AssignmentSubmission')
+    .update({
+      ...submission,
+      updatedAt: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select('*')
+    .single();
+};
+
+export const gradeSubmission = async (id: string, grade: number, feedback?: string) => {
+  return await supabase
+    .from('AssignmentSubmission')
+    .update({
+      grade,
+      feedback,
+      status: 'graded' as const,
+      graded_at: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select('*')
+    .single();
+};
+
+// NEW: Storage helpers for assignments
+export const uploadAssignmentFile = async (file: File, path: string) => {
+  try {
+    const { data, error } = await supabase.storage.from('assignments').upload(path, file);
+
+    if (error) throw error;
+
+    const { data: urlData } = supabase.storage.from('assignments').getPublicUrl(path);
+
+    return {
+      data: {
+        path: data.path,
+        url: urlData.publicUrl,
+      },
+      error: null,
+    };
+  } catch (error: any) {
+    return { data: null, error: error.message };
+  }
+};
+
+export const deleteAssignmentFile = async (path: string) => {
+  try {
+    const { error } = await supabase.storage.from('assignments').remove([path]);
+
+    if (error) throw error;
+    return { success: true, error: null };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
 };
