@@ -35,6 +35,7 @@ export interface LearningAnalytics {
 
   // Overall User Behavior
   overallStats: {
+    recentActivity: number;
     totalLoginSessions: number;
     totalTimeSpent: number; // in minutes
     preferredModule: 'brain' | 'writer' | 'both';

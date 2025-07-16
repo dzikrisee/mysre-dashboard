@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Paper, TextInput, PasswordInput, Button, Title, Text, Container, Stack, Box, Alert, Group, ThemeIcon, Divider, Card, Badge } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { IconUser, IconLock, IconInfoCircle, IconShield, IconLogin, IconMail, IconId } from '@tabler/icons-react';
@@ -9,7 +10,8 @@ import { useAuth } from '@/providers/auth-provider';
 export function SignIn() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { signIn } = useAuth();
+  const { signIn } = useAuth(); // This should work now
+  const router = useRouter();
 
   const form = useForm({
     initialValues: {
@@ -17,7 +19,7 @@ export function SignIn() {
       password: '',
     },
     validate: {
-      identifier: (value) => (value.length < 1 ? 'Email atau NIM harus diisi' : null), // Updated dari username ke NIM
+      identifier: (value) => (value.length < 1 ? 'Email atau NIM harus diisi' : null),
       password: (value) => (value.length < 6 ? 'Password minimal 6 karakter' : null),
     },
   });
@@ -26,13 +28,20 @@ export function SignIn() {
     setLoading(true);
     setError(null);
 
-    const result = await signIn(values.identifier, values.password);
+    try {
+      const result = await signIn(values.identifier, values.password);
 
-    if (!result.success) {
-      setError(result.error || 'Terjadi kesalahan saat masuk');
+      if (result.success) {
+        // Redirect to dashboard on successful login
+        router.push('/dashboard');
+      } else {
+        setError(result.error || 'Terjadi kesalahan saat masuk');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Terjadi kesalahan saat masuk');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   // Helper untuk mendeteksi apakah input adalah email atau NIM

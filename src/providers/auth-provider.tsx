@@ -1,6 +1,3 @@
-// src/providers/auth-provider.tsx - UPDATE EXISTING FILE
-// Tambahkan/update bagian ini di auth provider yang sudah ada
-
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
@@ -16,7 +13,6 @@ interface AuthUser {
   group?: string;
   nim?: string;
   avatar_url?: string;
-  // NEW: Additional profile fields
   phone?: string;
   bio?: string;
   university?: string;
@@ -31,6 +27,7 @@ interface AuthUser {
   isEmailVerified?: boolean;
   isPhoneVerified?: boolean;
   lastActive?: string;
+  token_balance?: number;
   settings?: {
     emailNotifications: boolean;
     pushNotifications: boolean;
@@ -48,8 +45,8 @@ interface AuthUser {
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
+  signIn: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signOut: () => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   updateProfile: (data: Partial<AuthUser>) => Promise<void>;
   isAdmin: () => boolean;
@@ -122,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           isEmailVerified: profile.isEmailVerified,
           isPhoneVerified: profile.isPhoneVerified,
           lastActive: profile.lastActive,
+          token_balance: profile.token_balance || 0,
           settings: profile.settings || {
             emailNotifications: true,
             pushNotifications: true,
@@ -150,23 +148,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const login = async (email: string, password: string) => {
+  const signIn = async (identifier: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
+      setLoading(true);
+
+      // Check if identifier is email or NIM
+      const isEmail = identifier.includes('@');
+
+      let email = identifier;
+
+      // If it's NIM, find the corresponding email
+      if (!isEmail) {
+        const { data: userData, error: userError } = await supabase.from('User').select('email').eq('nim', identifier).single();
+
+        if (userError || !userData) {
+          return { success: false, error: 'NIM tidak ditemukan' };
+        }
+
+        email = userData.email;
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
-        throw error;
+        return { success: false, error: error.message };
       }
 
       if (data.user) {
         await loadUserProfile(data.user.id);
+
+        notifications.show({
+          title: 'Berhasil',
+          message: 'Login berhasil!',
+          color: 'green',
+        });
+
+        return { success: true };
       }
+
+      return { success: false, error: 'Login gagal' };
     } catch (error: any) {
       console.error('Login error:', error);
-      throw new Error(error.message || 'Gagal login');
+      return { success: false, error: error.message || 'Terjadi kesalahan saat login' };
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -175,22 +203,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            name,
+          },
+        },
       });
 
       if (error) {
-        throw error;
+        throw new Error(error.message || 'Gagal mendaftar');
       }
 
       if (data.user) {
         // Create user profile in database
-        const { error: insertError } = await supabase.from('User').insert({
+        const { error: profileError } = await supabase.from('User').insert({
           id: data.user.id,
           email,
           name,
           role: 'USER',
           isEmailVerified: false,
           isPhoneVerified: false,
-          lastActive: new Date().toISOString(),
+          token_balance: 0,
           settings: {
             emailNotifications: true,
             pushNotifications: true,
@@ -205,14 +238,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         });
 
-        if (insertError) {
-          throw insertError;
+        if (profileError) {
+          throw new Error(profileError.message || 'Gagal membuat profil');
         }
-
-        await loadUserProfile(data.user.id);
       }
     } catch (error: any) {
-      console.error('Registration error:', error);
+      console.error('Register error:', error);
       throw new Error(error.message || 'Gagal mendaftar');
     }
   };
@@ -254,15 +285,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = async () => {
+  const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
         throw error;
       }
       setUser(null);
+
+      notifications.show({
+        title: 'Berhasil',
+        message: 'Logout berhasil!',
+        color: 'green',
+      });
     } catch (error: any) {
       console.error('Logout error:', error);
+      notifications.show({
+        title: 'Error',
+        message: error.message || 'Gagal logout',
+        color: 'red',
+      });
       throw new Error(error.message || 'Gagal logout');
     }
   };
@@ -274,8 +316,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value: AuthContextType = {
     user,
     loading,
-    login,
-    logout,
+    signIn,
+    signOut,
     register,
     updateProfile,
     isAdmin,
