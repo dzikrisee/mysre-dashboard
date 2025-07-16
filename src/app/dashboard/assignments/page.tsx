@@ -1,20 +1,26 @@
 // src/app/dashboard/assignments/page.tsx
-// Fixed version dengan form yang berfungsi
-
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Container, Stack, Title, Text, Group, Badge, Button, SimpleGrid, Card, ThemeIcon, LoadingOverlay, Alert, Paper, Box, TextInput, Textarea, NumberInput, Switch, Modal, FileInput, Divider } from '@mantine/core';
-import { DateTimePicker } from '@mantine/dates';
-import { useForm } from '@mantine/form';
-import { IconCalendar, IconPlus, IconClipboardList, IconFileText, IconClock, IconCheck, IconUsers, IconAlertCircle, IconFile } from '@tabler/icons-react';
+import { Container, Stack, Title, Text, Group, Badge, Button, Tabs, SimpleGrid, Card, ThemeIcon, ActionIcon, Menu, LoadingOverlay, Box, Paper, Alert } from '@mantine/core';
+import { IconCalendar, IconPlus, IconClipboardList, IconFileText, IconClock, IconCheck, IconUsers, IconDots, IconEye, IconEdit, IconTrash, IconDownload, IconAlertCircle } from '@tabler/icons-react';
 import { useAuth } from '@/providers/auth-provider';
+import { AssignmentService } from '@/lib/services/assignment.service';
+import { Assignment, AssignmentSubmission } from '@/lib/types/assignment';
+// Import components - will be created separately
+// import { AssignmentForm } from '@/components/assignments/assignment-form';
+// import { AssignmentList } from '@/components/assignments/assignment-list';
+// import { SubmissionList } from '@/components/assignments/submission-list';
+// import { AssignmentStats } from '@/components/assignments/assignment-stats';
 import { notifications } from '@mantine/notifications';
+import { modals } from '@mantine/modals';
 
-export default function AssignmentPage() {
+export default function AssignmentDashboard() {
   const { user, isAdmin } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<string | null>('overview');
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [submissions, setSubmissions] = useState<AssignmentSubmission[]>([]);
   const [stats, setStats] = useState({
     totalAssignments: 0,
     activeAssignments: 0,
@@ -22,49 +28,40 @@ export default function AssignmentPage() {
     pendingSubmissions: 0,
     gradedSubmissions: 0,
   });
-
-  const form = useForm({
-    initialValues: {
-      title: '',
-      description: '',
-      week_number: 1,
-      assignment_code: '',
-      due_date: null,
-      is_active: true,
-    },
-    validate: {
-      title: (value) => (value.trim().length < 3 ? 'Judul minimal 3 karakter' : null),
-      description: (value) => (value.trim().length < 10 ? 'Deskripsi minimal 10 karakter' : null),
-      week_number: (value) => (value < 1 || value > 20 ? 'Minggu harus antara 1-20' : null),
-      assignment_code: (value) => {
-        if (!/^[A-Z0-9]{3,4}$/.test(value)) {
-          return 'Code harus 3-4 karakter huruf/angka kapital';
-        }
-        return null;
-      },
-    },
-  });
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
 
   useEffect(() => {
     if (!isAdmin()) {
       return;
     }
-    loadInitialData();
+    loadData();
   }, []);
 
-  const loadInitialData = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      // TODO: Load real data from Supabase
-      // Temporarily using mock data
-      setStats({
-        totalAssignments: 5,
-        activeAssignments: 3,
-        totalSubmissions: 12,
-        pendingSubmissions: 4,
-        gradedSubmissions: 8,
-      });
+      const [assignmentsResult, submissionsResult, statsResult] = await Promise.all([AssignmentService.getAllAssignments(), AssignmentService.getAllSubmissions(), AssignmentService.getAssignmentStats()]);
+
+      if (assignmentsResult.error) {
+        console.error('Error loading assignments:', assignmentsResult.error);
+      } else {
+        setAssignments(assignmentsResult.data || []);
+      }
+
+      if (submissionsResult.error) {
+        console.error('Error loading submissions:', submissionsResult.error);
+      } else {
+        setSubmissions(submissionsResult.data || []);
+      }
+
+      if (statsResult.error) {
+        console.error('Error loading stats:', statsResult.error);
+      } else {
+        setStats(statsResult.data || stats);
+      }
     } catch (error) {
+      console.error('Error loading data:', error);
       notifications.show({
         title: 'Error',
         message: 'Gagal memuat data assignment',
@@ -76,41 +73,54 @@ export default function AssignmentPage() {
   };
 
   const handleCreateAssignment = () => {
-    setShowCreateModal(true);
+    setEditingAssignment(null);
+    setShowCreateForm(true);
   };
 
-  const generateRandomCode = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
-    for (let i = 0; i < 4; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    form.setFieldValue('assignment_code', result);
+  const handleEditAssignment = (assignment: Assignment) => {
+    setEditingAssignment(assignment);
+    setShowCreateForm(true);
   };
 
-  const handleSubmit = async (values: typeof form.values) => {
-    setLoading(true);
-    try {
-      // TODO: Implement actual save to Supabase
-      console.log('Assignment data:', values);
+  const handleDeleteAssignment = (assignment: Assignment) => {
+    modals.openConfirmModal({
+      title: 'Hapus Assignment',
+      children: (
+        <Text size="sm">
+          Apakah Anda yakin ingin menghapus assignment <strong>{assignment.title}</strong>? Semua submission yang terkait juga akan terhapus. Tindakan ini tidak dapat dibatalkan.
+        </Text>
+      ),
+      labels: { confirm: 'Hapus', cancel: 'Batal' },
+      confirmProps: { color: 'red' },
+      onConfirm: async () => {
+        const result = await AssignmentService.deleteAssignment(assignment.id);
+        if (result.error) {
+          notifications.show({
+            title: 'Error',
+            message: result.error,
+            color: 'red',
+          });
+        } else {
+          notifications.show({
+            title: 'Berhasil',
+            message: 'Assignment berhasil dihapus',
+            color: 'green',
+          });
+          loadData();
+        }
+      },
+    });
+  };
 
-      notifications.show({
-        title: 'Success (Demo)',
-        message: 'Assignment form submitted! Database integration coming soon.',
-        color: 'green',
-      });
+  const handleFormSuccess = () => {
+    setShowCreateForm(false);
+    setEditingAssignment(null);
+    loadData();
+  };
 
-      setShowCreateModal(false);
-      form.reset();
-    } catch (error) {
-      notifications.show({
-        title: 'Error',
-        message: 'Gagal menyimpan assignment',
-        color: 'red',
-      });
-    } finally {
-      setLoading(false);
-    }
+  const handleFormCancel = () => {
+    setShowCreateForm(false);
+    setEditingAssignment(null);
   };
 
   if (!isAdmin()) {
@@ -127,8 +137,8 @@ export default function AssignmentPage() {
     <Container size="xl" py="xl">
       <LoadingOverlay visible={loading} />
 
+      {/* Header */}
       <Stack gap="xl">
-        {/* Header */}
         <Group justify="space-between">
           <div>
             <Title order={2}>Assignment Management</Title>
@@ -143,11 +153,31 @@ export default function AssignmentPage() {
                 day: 'numeric',
               })}
             </Badge>
-            <Button leftSection={<IconPlus size={16} />} onClick={handleCreateAssignment}>
+            <Button leftSection={<IconPlus size={16} />} onClick={handleCreateAssignment} disabled={showCreateForm}>
               Buat Assignment Baru
             </Button>
           </Group>
         </Group>
+
+        {/* Create/Edit Form */}
+        {showCreateForm && (
+          <Paper withBorder shadow="sm" radius="md" p="xl">
+            <Box>
+              <Title order={3} mb="md">
+                {editingAssignment ? 'Edit Assignment' : 'Buat Assignment Baru'}
+              </Title>
+              <Text c="gray.6" mb="lg">
+                Form assignment akan ditampilkan di sini setelah component dibuat
+              </Text>
+              <Group>
+                <Button variant="light" onClick={handleFormCancel}>
+                  Batal
+                </Button>
+                <Button onClick={handleFormSuccess}>Simpan</Button>
+              </Group>
+            </Box>
+          </Paper>
+        )}
 
         {/* Stats Overview */}
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
@@ -228,102 +258,125 @@ export default function AssignmentPage() {
           </Card>
         </SimpleGrid>
 
-        {/* Coming Soon Sections */}
-        <Stack gap="md">
-          <Paper withBorder shadow="sm" radius="md" p="xl">
-            <Stack align="center" gap="md">
-              <IconClipboardList size={48} color="var(--mantine-color-blue-4)" />
-              <div style={{ textAlign: 'center' }}>
-                <Text fw={600} size="lg" mb={4}>
-                  Assignment Management
-                </Text>
-                <Text c="gray.6" size="sm" mb="md">
-                  Sistem untuk membuat dan mengelola assignment dengan code unik 3-4 digit
-                </Text>
-                <Text size="xs" c="gray.5">
-                  Status: Database schema ready, Form integration in progress
-                </Text>
-              </div>
-            </Stack>
-          </Paper>
+        {/* Tabs Content */}
+        <Tabs value={activeTab} onChange={setActiveTab}>
+          <Tabs.List>
+            <Tabs.Tab value="overview" leftSection={<IconClipboardList size={16} />}>
+              Overview
+            </Tabs.Tab>
+            <Tabs.Tab value="assignments" leftSection={<IconFileText size={16} />}>
+              Daftar Assignment ({assignments.length})
+            </Tabs.Tab>
+            <Tabs.Tab value="submissions" leftSection={<IconUsers size={16} />}>
+              Submission ({submissions.length})
+            </Tabs.Tab>
+          </Tabs.List>
 
-          <Paper withBorder shadow="sm" radius="md" p="xl">
-            <Stack align="center" gap="md">
-              <IconUsers size={48} color="var(--mantine-color-green-4)" />
-              <div style={{ textAlign: 'center' }}>
-                <Text fw={600} size="lg" mb={4}>
-                  Submission Monitoring
-                </Text>
-                <Text c="gray.6" size="sm" mb="md">
-                  Monitoring pengumpulan tugas mahasiswa dan sistem penilaian
-                </Text>
-                <Text size="xs" c="gray.5">
-                  Status: Database structure complete, implementing UI
-                </Text>
-              </div>
-            </Stack>
-          </Paper>
-        </Stack>
-
-        {/* Implementation Progress */}
-        <Alert icon={<IconAlertCircle size={16} />} title="Implementation Status" color="blue" variant="light">
-          <Text size="sm" mb="md">
-            <strong>Assignment Management System sedang dalam tahap implementasi:</strong>
-          </Text>
-          <Stack gap="xs">
-            <Text size="sm">✅ Database schema created (Assignment & AssignmentSubmission tables)</Text>
-            <Text size="sm">✅ Navigation menu integrated</Text>
-            <Text size="sm">✅ Basic form modal implemented</Text>
-            <Text size="sm">🔄 Service functions in development</Text>
-            <Text size="sm">⏳ File upload integration pending</Text>
-            <Text size="sm">⏳ Student submission interface pending</Text>
-          </Stack>
-        </Alert>
-      </Stack>
-
-      {/* Create Assignment Modal */}
-      <Modal opened={showCreateModal} onClose={() => setShowCreateModal(false)} title="Buat Assignment Baru" size="lg">
-        <form onSubmit={form.onSubmit(handleSubmit)}>
-          <Stack gap="md">
-            <TextInput label="Judul Assignment" placeholder="Masukkan judul assignment..." required {...form.getInputProps('title')} />
-
-            <Textarea label="Deskripsi" placeholder="Masukkan deskripsi assignment..." required minRows={3} maxRows={6} autosize {...form.getInputProps('description')} />
-
-            <Group grow>
-              <NumberInput label="Minggu Ke" placeholder="1" required min={1} max={20} {...form.getInputProps('week_number')} />
-
-              <div>
-                <Group mb={5}>
-                  <Text component="label" size="sm" fw={500}>
-                    Assignment Code *
+          <Tabs.Panel value="overview" pt="xl">
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl">
+              {/* Recent Assignments */}
+              <Card withBorder shadow="sm" radius="md" p="lg">
+                <Group justify="space-between" mb="md">
+                  <Text fw={600} size="lg">
+                    Assignment Terbaru
                   </Text>
-                  <Button variant="subtle" size="xs" onClick={generateRandomCode}>
-                    Generate Random
-                  </Button>
+                  <ActionIcon variant="subtle" color="blue" onClick={() => setActiveTab('assignments')}>
+                    <IconEye size={16} />
+                  </ActionIcon>
                 </Group>
-                <TextInput placeholder="A1B2" required maxLength={4} {...form.getInputProps('assignment_code')} />
-              </div>
-            </Group>
+                <Stack gap="sm">
+                  {assignments.slice(0, 3).map((assignment) => (
+                    <Group key={assignment.id} justify="space-between" p="sm" style={{ borderRadius: '8px', backgroundColor: 'var(--mantine-color-gray-0)' }}>
+                      <div>
+                        <Text fw={500} size="sm">
+                          {assignment.title}
+                        </Text>
+                        <Text size="xs" c="gray.6">
+                          Minggu {assignment.week_number} • Code: {assignment.assignment_code}
+                        </Text>
+                      </div>
+                      <Badge size="sm" color={assignment.is_active ? 'green' : 'gray'} variant="light">
+                        {assignment.is_active ? 'Aktif' : 'Nonaktif'}
+                      </Badge>
+                    </Group>
+                  ))}
+                  {assignments.length === 0 && (
+                    <Text size="sm" c="gray.5" ta="center" py="xl">
+                      Belum ada assignment yang dibuat
+                    </Text>
+                  )}
+                </Stack>
+              </Card>
 
-            <DateTimePicker label="Deadline (Opsional)" placeholder="Pilih tanggal dan waktu deadline" leftSection={<IconCalendar size={16} />} clearable {...form.getInputProps('due_date')} />
+              {/* Recent Submissions */}
+              <Card withBorder shadow="sm" radius="md" p="lg">
+                <Group justify="space-between" mb="md">
+                  <Text fw={600} size="lg">
+                    Submission Terbaru
+                  </Text>
+                  <ActionIcon variant="subtle" color="blue" onClick={() => setActiveTab('submissions')}>
+                    <IconEye size={16} />
+                  </ActionIcon>
+                </Group>
+                <Stack gap="sm">
+                  {submissions.slice(0, 3).map((submission) => (
+                    <Group key={submission.id} justify="space-between" p="sm" style={{ borderRadius: '8px', backgroundColor: 'var(--mantine-color-gray-0)' }}>
+                      <div>
+                        <Text fw={500} size="sm">
+                          {submission.student?.name}
+                        </Text>
+                        <Text size="xs" c="gray.6">
+                          {submission.assignment?.title}
+                        </Text>
+                      </div>
+                      <Badge size="sm" color={submission.status === 'graded' ? 'green' : submission.status === 'submitted' ? 'blue' : 'gray'} variant="light">
+                        {submission.status === 'graded' ? 'Dinilai' : submission.status === 'submitted' ? 'Dikumpulkan' : 'Pending'}
+                      </Badge>
+                    </Group>
+                  ))}
+                  {submissions.length === 0 && (
+                    <Text size="sm" c="gray.5" ta="center" py="xl">
+                      Belum ada submission
+                    </Text>
+                  )}
+                </Stack>
+              </Card>
+            </SimpleGrid>
+          </Tabs.Panel>
 
-            <Divider label="File Assignment (Opsional)" labelPosition="left" />
+          <Tabs.Panel value="assignments" pt="xl">
+            <Paper withBorder shadow="sm" radius="md" p="xl">
+              <Stack align="center" gap="md">
+                <IconFileText size={48} color="var(--mantine-color-gray-4)" />
+                <div style={{ textAlign: 'center' }}>
+                  <Text fw={600} size="lg" mb={4}>
+                    Assignment List
+                  </Text>
+                  <Text c="gray.6" size="sm">
+                    Component AssignmentList akan ditampilkan di sini setelah dibuat
+                  </Text>
+                </div>
+              </Stack>
+            </Paper>
+          </Tabs.Panel>
 
-            <FileInput label="Upload File Assignment" placeholder="Pilih file (PDF, DOC, DOCX, max 10MB)" leftSection={<IconFile size={16} />} accept=".pdf,.doc,.docx,.txt" />
-
-            <Switch label="Assignment Aktif" description="Assignment akan terlihat oleh mahasiswa ketika aktif" {...form.getInputProps('is_active', { type: 'checkbox' })} />
-
-            <Group justify="flex-end" mt="xl">
-              <Button variant="light" onClick={() => setShowCreateModal(false)}>
-                Batal
-              </Button>
-              <Button type="submit" loading={loading}>
-                Buat Assignment
-              </Button>
-            </Group>
-          </Stack>
-        </form>
-      </Modal>
+          <Tabs.Panel value="submissions" pt="xl">
+            <Paper withBorder shadow="sm" radius="md" p="xl">
+              <Stack align="center" gap="md">
+                <IconUsers size={48} color="var(--mantine-color-gray-4)" />
+                <div style={{ textAlign: 'center' }}>
+                  <Text fw={600} size="lg" mb={4}>
+                    Submission List
+                  </Text>
+                  <Text c="gray.6" size="sm">
+                    Component SubmissionList akan ditampilkan di sini setelah dibuat
+                  </Text>
+                </div>
+              </Stack>
+            </Paper>
+          </Tabs.Panel>
+        </Tabs>
+      </Stack>
     </Container>
   );
 }
