@@ -1,9 +1,28 @@
+// src/components/layout/dashboard-layout.tsx - UPDATE EXISTING FILE
+// Tambahkan import IconClipboardList dan update navLinks
+
 'use client';
 
 import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { AppShell, Group, Text, UnstyledButton, Burger, Image, Stack, Avatar, Menu, ActionIcon, Tooltip, Badge, Divider, Box } from '@mantine/core';
-import { IconDashboard, IconUsers, IconFileText, IconPencil, IconBulb, IconReportAnalytics, IconReceipt, IconCoin, IconChevronRight, IconBell, IconLogout, IconSettings, IconUser, IconCurrencyDollar } from '@tabler/icons-react';
+import {
+  IconDashboard,
+  IconUsers,
+  IconFileText,
+  IconPencil,
+  IconBulb,
+  IconReportAnalytics,
+  IconReceipt,
+  IconCoin,
+  IconChevronRight,
+  IconBell,
+  IconLogout,
+  IconSettings,
+  IconUser,
+  IconCurrencyDollar,
+  IconClipboardList, // TAMBAHKAN INI
+} from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -57,10 +76,11 @@ function NavLink({ icon, label, href, active, onClick, badge, badgeColor = 'blue
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [opened, { toggle, close }] = useDisclosure();
-  const { user, signOut, isAdmin } = useAuth(); // FIXED: Use signOut instead of logout
+  const { user, signOut, isAdmin } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
 
+  // UPDATE: navLinks dengan assignment menu
   const navLinks = [
     {
       icon: <IconDashboard size={20} />,
@@ -76,6 +96,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       icon: <IconFileText size={20} />,
       label: 'List Artikel',
       href: '/dashboard/articles',
+    },
+    // TAMBAHKAN MENU ASSIGNMENT BARU
+    {
+      icon: <IconClipboardList size={20} />,
+      label: 'Assignment',
+      href: '/dashboard/assignments',
+      badge: 'NEW',
+      badgeColor: 'red',
     },
     {
       icon: <IconPencil size={20} />,
@@ -101,7 +129,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     },
   ];
 
-  // FIXED: Use signOut method
   const handleLogout = async () => {
     try {
       await signOut();
@@ -142,7 +169,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <ActionIcon variant="light" size="lg" color="green">
                   <Group gap="xs">
                     <IconCoin size={16} />
-                    {/* FIXED: Use span instead of Text to avoid nesting issues */}
                     <span style={{ fontSize: '12px', fontWeight: 600 }}>{user.token_balance?.toLocaleString() || '0'}</span>
                   </Group>
                 </ActionIcon>
@@ -155,7 +181,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <ActionIcon variant="light" size="lg" color="green">
                   <Group gap="xs">
                     <IconCurrencyDollar size={16} />
-                    {/* FIXED: Use span instead of Text to avoid nesting issues */}
                     <span style={{ fontSize: '12px', fontWeight: 600 }}>$2.4K</span>
                   </Group>
                 </ActionIcon>

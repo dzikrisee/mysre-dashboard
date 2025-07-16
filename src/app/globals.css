@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 :root {
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
@@ -91,5 +93,129 @@ textarea:focus {
 @media (min-width: 769px) {
   .hide-desktop {
     display: none !important;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+body {
+  color: var(--mantine-color-text);
+  background: var(--mantine-color-body);
+}
+
+/* Dark mode fixes */
+[data-mantine-color-scheme='dark'] {
+  color-scheme: dark;
+}
+
+[data-mantine-color-scheme='dark'] body {
+  background: var(--mantine-color-dark-7);
+  color: var(--mantine-color-dark-0);
+}
+
+[data-mantine-color-scheme='light'] body {
+  background: var(--mantine-color-gray-0);
+  color: var(--mantine-color-dark-7);
+}
+
+/* Fix untuk background putih yang masih muncul */
+[data-mantine-color-scheme='dark'] .mantine-AppShell-main {
+  background: var(--mantine-color-dark-7) !important;
+}
+
+[data-mantine-color-scheme='dark'] .mantine-AppShell-header {
+  background: var(--mantine-color-dark-6) !important;
+  border-bottom: 1px solid var(--mantine-color-dark-5) !important;
+}
+
+[data-mantine-color-scheme='dark'] .mantine-AppShell-navbar {
+  background: var(--mantine-color-dark-6) !important;
+  border-right: 1px solid var(--mantine-color-dark-5) !important;
+}
+
+/* Fix untuk Card dark mode */
+[data-mantine-color-scheme='dark'] .mantine-Card-root {
+  background: var(--mantine-color-dark-6) !important;
+  border: 1px solid var(--mantine-color-dark-4) !important;
+}
+
+/* Fix untuk Modal dark mode */
+[data-mantine-color-scheme='dark'] .mantine-Modal-content {
+  background: var(--mantine-color-dark-6) !important;
+}
+
+/* Fix untuk Tabs dark mode */
+[data-mantine-color-scheme='dark'] .mantine-Tabs-tab {
+  color: var(--mantine-color-dark-1) !important;
+}
+
+[data-mantine-color-scheme='dark'] .mantine-Tabs-tab[data-active='true'] {
+  color: var(--mantine-color-blue-4) !important;
+}
+
+/* Fix untuk inputs dark mode */
+[data-mantine-color-scheme='dark'] .mantine-TextInput-input,
+[data-mantine-color-scheme='dark'] .mantine-PasswordInput-input,
+[data-mantine-color-scheme='dark'] .mantine-Select-input,
+[data-mantine-color-scheme='dark'] .mantine-Textarea-input {
+  background: var(--mantine-color-dark-5) !important;
+  border: 1px solid var(--mantine-color-dark-4) !important;
+  color: var(--mantine-color-dark-0) !important;
+}
+
+[data-mantine-color-scheme='dark'] .mantine-TextInput-input:focus,
+[data-mantine-color-scheme='dark'] .mantine-PasswordInput-input:focus,
+[data-mantine-color-scheme='dark'] .mantine-Select-input:focus,
+[data-mantine-color-scheme='dark'] .mantine-Textarea-input:focus {
+  border-color: var(--mantine-color-blue-6) !important;
+}
+
+/* Fix untuk dropdown dark mode */
+[data-mantine-color-scheme='dark'] .mantine-Select-dropdown {
+  background: var(--mantine-color-dark-6) !important;
+  border: 1px solid var(--mantine-color-dark-4) !important;
+}
+
+[data-mantine-color-scheme='dark'] .mantine-Select-option {
+  color: var(--mantine-color-dark-0) !important;
+}
+
+[data-mantine-color-scheme='dark'] .mantine-Select-option:hover {
+  background: var(--mantine-color-dark-5) !important;
+}
+
+/* Fix untuk Table dark mode */
+[data-mantine-color-scheme='dark'] .mantine-Table-table {
+  background: var(--mantine-color-dark-6) !important;
+}
+
+[data-mantine-color-scheme='dark'] .mantine-Table-tr {
+  border-bottom: 1px solid var(--mantine-color-dark-4) !important;
+}
+
+/* Smooth transitions */
+* {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  html {
+    color-scheme: dark;
   }
 }
