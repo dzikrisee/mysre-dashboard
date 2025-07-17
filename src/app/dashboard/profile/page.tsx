@@ -398,8 +398,8 @@ export default function ProfilePage() {
     }
   };
 
-  const handleAvatarUpload = async (file: File) => {
-    if (!user?.id) return;
+  const handleAvatarUpload = async (file: File | null) => {
+    if (!file || !user?.id) return;
 
     // Validate file type
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
@@ -424,15 +424,6 @@ export default function ProfilePage() {
 
     setSaving(true);
     try {
-      // FIXED: Show preview immediately while uploading
-      const fileReader = new FileReader();
-      fileReader.onload = (e) => {
-        const result = e.target?.result as string;
-        // Update profile state with preview
-        setProfile((prev) => (prev ? { ...prev, avatar_url: result } : null));
-      };
-      fileReader.readAsDataURL(file);
-
       // Upload to Supabase Storage
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
@@ -453,19 +444,20 @@ export default function ProfilePage() {
 
       const avatarUrl = urlData.publicUrl;
 
-      // Update user profile in database
-      const { error: updateError } = await updateUserProfile(user.id, {
-        avatar_url: avatarUrl,
-      });
+      // FIXED: Update user profile dengan kolom yang benar
+      const { error: updateError } = await supabase
+        .from('User')
+        .update({
+          avatar_url: avatarUrl,
+          updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
+        })
+        .eq('id', user.id);
 
       if (updateError) {
         throw updateError;
       }
 
-      // Update local state with real URL
-      setProfile((prev) => (prev ? { ...prev, avatar_url: avatarUrl } : null));
-
-      // Refresh auth context to update navbar
+      // Refresh user data
       await refreshUser();
 
       notifications.show({
@@ -476,12 +468,9 @@ export default function ProfilePage() {
     } catch (error: any) {
       console.error('Avatar upload error:', error);
 
-      // Revert preview on error
-      await loadProfile();
-
       notifications.show({
         title: 'Error',
-        message: error.message || 'Gagal mengupload foto profil',
+        message: error.message || 'Gagal upload foto profil',
         color: 'red',
       });
     } finally {

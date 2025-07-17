@@ -40,6 +40,8 @@ interface AuthUser {
       showProfile: boolean;
     };
   };
+  createdAt?: string;
+  updated_at?: string; // FIXED: Konsisten dengan database
 }
 
 interface AuthContextType {
@@ -93,8 +95,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (profile) {
-        // Update last active
-        await updateLastActive(userId);
+        // Update last active dengan kolom yang benar
+        await supabase
+          .from('User')
+          .update({
+            lastActive: new Date().toISOString(),
+            updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
+          })
+          .eq('id', userId);
 
         // Map database user to AuthUser
         const authUser: AuthUser = {
@@ -132,6 +140,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               showProfile: true,
             },
           },
+          createdAt: profile.createdAt,
+          updated_at: profile.updated_at, // FIXED: Konsisten dengan database
         };
 
         setUser(authUser);
@@ -149,36 +159,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (identifier: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    setLoading(true);
     try {
-      setLoading(true);
+      // Try to authenticate with email or NIM
+      let authResult;
 
-      // Check if identifier is email or NIM
-      const isEmail = identifier.includes('@');
+      // First try with email
+      if (identifier.includes('@')) {
+        authResult = await supabase.auth.signInWithPassword({
+          email: identifier,
+          password,
+        });
+      } else {
+        // Try to find user by NIM first
+        const { data: userWithNim } = await supabase.from('User').select('email').eq('nim', identifier).single();
 
-      let email = identifier;
-
-      // If it's NIM, find the corresponding email
-      if (!isEmail) {
-        const { data: userData, error: userError } = await supabase.from('User').select('email').eq('nim', identifier).single();
-
-        if (userError || !userData) {
+        if (userWithNim) {
+          authResult = await supabase.auth.signInWithPassword({
+            email: userWithNim.email,
+            password,
+          });
+        } else {
           return { success: false, error: 'NIM tidak ditemukan' };
         }
-
-        email = userData.email;
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        return { success: false, error: error.message };
+      if (authResult.error) {
+        throw authResult.error;
       }
 
-      if (data.user) {
-        await loadUserProfile(data.user.id);
+      if (authResult.data.user) {
+        await loadUserProfile(authResult.data.user.id);
 
         notifications.show({
           title: 'Berhasil',
@@ -224,6 +235,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           isEmailVerified: false,
           isPhoneVerified: false,
           token_balance: 0,
+          createdAt: new Date().toISOString(),
+          updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
           settings: {
             emailNotifications: true,
             pushNotifications: true,
@@ -256,7 +269,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .from('User')
         .update({
           ...data,
-          updateAt: new Date().toISOString(),
+          updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
         })
         .eq('id', user.id)
         .select('*')
@@ -305,7 +318,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         message: error.message || 'Gagal logout',
         color: 'red',
       });
-      throw new Error(error.message || 'Gagal logout');
     }
   };
 

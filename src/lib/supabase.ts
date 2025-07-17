@@ -252,12 +252,15 @@ export const getUserProfile = async (userId: string) => {
   return await supabase.from('User').select('*').eq('id', userId).single();
 };
 
-export const updateUserProfile = async (userId: string, profileData: UserUpdate) => {
+// Update HANYA bagian helper functions di src/lib/supabase.ts
+// Ganti semua fungsi helper ini dengan versi yang menggunakan updated_at
+
+export const updateUserProfile = async (userId: string, profileData: any) => {
   return await supabase
     .from('User')
     .update({
       ...profileData,
-      updateAt: new Date().toISOString(),
+      updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
     })
     .eq('id', userId)
     .select('*')
@@ -269,7 +272,7 @@ export const updateUserSettings = async (userId: string, settings: any) => {
     .from('User')
     .update({
       settings,
-      updateAt: new Date().toISOString(),
+      updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
     })
     .eq('id', userId)
     .select('*')
@@ -281,6 +284,7 @@ export const updateLastActive = async (userId: string) => {
     .from('User')
     .update({
       lastActive: new Date().toISOString(),
+      updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
     })
     .eq('id', userId);
 };
@@ -290,7 +294,7 @@ export const verifyUserEmail = async (userId: string) => {
     .from('User')
     .update({
       isEmailVerified: true,
-      updateAt: new Date().toISOString(),
+      updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
     })
     .eq('id', userId);
 };
@@ -300,11 +304,12 @@ export const verifyUserPhone = async (userId: string) => {
     .from('User')
     .update({
       isPhoneVerified: true,
-      updateAt: new Date().toISOString(),
+      updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
     })
     .eq('id', userId);
 };
 
+// FIXED: Avatar upload function
 export const uploadUserAvatar = async (userId: string, file: File) => {
   try {
     // Validate file type
@@ -338,7 +343,7 @@ export const uploadUserAvatar = async (userId: string, file: File) => {
       .from('User')
       .update({
         avatar_url: urlData.publicUrl,
-        updateAt: new Date().toISOString(),
+        updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
       })
       .eq('id', userId)
       .select('*')
