@@ -1,3 +1,4 @@
+// src/lib/types/assignment.ts
 export interface Assignment {
   id: string;
   title: string;
@@ -8,6 +9,7 @@ export interface Assignment {
   file_name?: string | null;
   due_date?: string | null;
   is_active: boolean;
+  target_classes: string[]; // NEW: ['A', 'B'] or ['A'] or ['B']
   created_by: string; // admin user id
   createdAt: string;
   updatedAt: string;
@@ -54,6 +56,7 @@ export interface AssignmentInsert {
   file_name?: string | null;
   due_date?: string | null;
   is_active?: boolean;
+  target_classes: string[]; // NEW: Required target classes
   created_by: string;
 }
 
@@ -66,6 +69,7 @@ export interface AssignmentUpdate {
   file_name?: string | null;
   due_date?: string | null;
   is_active?: boolean;
+  target_classes?: string[]; // NEW: Update target classes
   updatedAt?: string;
 }
 

@@ -1,15 +1,15 @@
-// src/components/assignment/assignment-form.tsx - FIXED VERSION
+// src/components/assignment/assignment-form.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Stack, TextInput, Textarea, NumberInput, Button, Group, Switch, FileInput, Alert, Text, Title, Divider, Box } from '@mantine/core';
+import { Box, Stack, Group, Title, TextInput, Textarea, NumberInput, Button, Switch, Divider, FileInput, Alert, Text, Chip, Checkbox, MultiSelect } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import { useForm } from '@mantine/form';
-import { IconFile, IconCalendar, IconAlertCircle, IconCheck } from '@tabler/icons-react';
-import { useAuth } from '@/providers/auth-provider';
-import { AssignmentService } from '@/lib/services/assignment.service';
-import { Assignment, AssignmentInsert, AssignmentUpdate } from '@/lib/types/assignment';
 import { notifications } from '@mantine/notifications';
+import { IconFile, IconCalendar, IconCheck, IconAlertCircle, IconUsers } from '@tabler/icons-react';
+import { uploadFile } from '@/lib/services/storage.service';
+import { useAuth } from '@/hooks/useAuth';
+import type { Assignment } from '@/lib/types/assignment';
 
 interface AssignmentFormProps {
   assignment?: Assignment | null;
@@ -32,19 +32,40 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
       assignment_code: assignment?.assignment_code || '',
       due_date: assignment?.due_date ? new Date(assignment.due_date) : null,
       is_active: assignment?.is_active ?? true,
+      target_classes: assignment?.target_classes || ['A', 'B'], // Default kedua kelas
     },
     validate: {
-      title: (value) => (value.trim().length < 3 ? 'Judul minimal 3 karakter' : null),
-      description: (value) => (value.trim().length < 10 ? 'Deskripsi minimal 10 karakter' : null),
+      title: (value) => (!value ? 'Judul harus diisi' : null),
+      description: (value) => (!value ? 'Deskripsi harus diisi' : null),
       week_number: (value) => (value < 1 || value > 20 ? 'Minggu harus antara 1-20' : null),
       assignment_code: (value) => {
-        if (!/^[A-Z0-9]{3,4}$/.test(value)) {
-          return 'Code harus 3-4 karakter huruf/angka kapital';
-        }
+        if (!value) return 'Assignment code harus diisi';
+        if (value.length < 3 || value.length > 4) return 'Code harus 3-4 karakter';
+        if (!/^[A-Z0-9]+$/.test(value)) return 'Code hanya boleh huruf besar dan angka';
         return null;
       },
+      target_classes: (value) => (!value || value.length === 0 ? 'Pilih minimal satu kelas' : null),
     },
   });
+
+  // Check assignment code availability
+  useEffect(() => {
+    const checkCode = async () => {
+      if (form.values.assignment_code.length >= 3) {
+        try {
+          const exists = await AssignmentService.checkAssignmentCodeExists(form.values.assignment_code, assignment?.id);
+          setCodeError(exists ? 'Code sudah digunakan' : null);
+        } catch (error) {
+          console.error('Error checking code:', error);
+        }
+      } else {
+        setCodeError(null);
+      }
+    };
+
+    const debounce = setTimeout(checkCode, 500);
+    return () => clearTimeout(debounce);
+  }, [form.values.assignment_code, assignment?.id]);
 
   const generateRandomCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -53,109 +74,24 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     form.setFieldValue('assignment_code', result);
-    checkCodeExists(result);
-  };
-
-  const checkCodeExists = async (code: string) => {
-    if (code.length < 3) return;
-
-    try {
-      const result = await AssignmentService.checkAssignmentCodeExists(code, assignment?.id);
-      if (result.exists) {
-        setCodeError('Code sudah digunakan, silakan gunakan code lain');
-      } else {
-        setCodeError(null);
-      }
-    } catch (error) {
-      console.error('Error checking code:', error);
-    }
   };
 
   const handleCodeChange = (value: string) => {
-    const upperValue = value.toUpperCase();
-    form.setFieldValue('assignment_code', upperValue);
-    if (upperValue.length >= 3) {
-      checkCodeExists(upperValue);
-    } else {
-      setCodeError(null);
+    const upperValue = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (upperValue.length <= 4) {
+      form.setFieldValue('assignment_code', upperValue);
     }
   };
 
-  const uploadFile = async (file: File): Promise<{ url: string; name: string } | null> => {
-    if (!file) return null;
-
-    setUploadingFile(true);
-    try {
-      const fileName = `${Date.now()}_${file.name}`;
-      const filePath = `assignments/${fileName}`;
-
-      const result = await AssignmentService.uploadAssignmentFile(file, filePath);
-
-      if (result.error) {
-        notifications.show({
-          title: 'Error Upload',
-          message: result.error,
-          color: 'red',
-        });
-        return null;
-      }
-
-      return {
-        url: result.data?.url || '',
-        name: file.name,
-      };
-    } catch (error) {
-      console.error('Upload error:', error);
-      notifications.show({
-        title: 'Error Upload',
-        message: 'Gagal mengupload file',
-        color: 'red',
-      });
-      return null;
-    } finally {
-      setUploadingFile(false);
-    }
-  };
-
-  // FIXED: Safe date handling function
-  const formatDueDate = (date: any): string | null => {
-    if (!date) return null;
-
-    try {
-      // If it's already a Date object
-      if (date instanceof Date) {
-        return date.toISOString();
-      }
-
-      // If it's a string, try to convert to Date
-      if (typeof date === 'string') {
-        const dateObj = new Date(date);
-        if (!isNaN(dateObj.getTime())) {
-          return dateObj.toISOString();
-        }
-      }
-
-      // If it's a timestamp number
-      if (typeof date === 'number') {
-        const dateObj = new Date(date);
-        if (!isNaN(dateObj.getTime())) {
-          return dateObj.toISOString();
-        }
-      }
-
-      console.warn('Invalid date format:', date);
-      return null;
-    } catch (error) {
-      console.error('Date formatting error:', error);
-      return null;
-    }
+  const handleTargetClassesChange = (classes: string[]) => {
+    form.setFieldValue('target_classes', classes);
   };
 
   const handleSubmit = async (values: typeof form.values) => {
     if (codeError) {
       notifications.show({
         title: 'Error',
-        message: 'Perbaiki error yang ada sebelum submit',
+        message: 'Assignment code sudah digunakan',
         color: 'red',
       });
       return;
@@ -166,55 +102,48 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
       let fileUrl = assignment?.file_url || null;
       let fileName = assignment?.file_name || null;
 
-      // Upload file if new file selected
+      // Upload file if selected
       if (file) {
-        const uploadResult = await uploadFile(file);
-        if (uploadResult) {
-          fileUrl = uploadResult.url;
-          fileName = uploadResult.name;
-        } else {
-          // If upload failed, stop the process
-          setLoading(false);
-          return;
+        setUploadingFile(true);
+        const uploadResult = await uploadFile(file, 'assignments');
+        if (uploadResult.error) {
+          throw new Error(uploadResult.error);
         }
+        fileUrl = uploadResult.url;
+        fileName = file.name;
+        setUploadingFile(false);
       }
 
-      // FIXED: Safe due_date handling
-      const formattedDueDate = formatDueDate(values.due_date);
-
-      const data = {
-        ...values,
-        due_date: formattedDueDate,
+      const assignmentData = {
+        title: values.title,
+        description: values.description,
+        week_number: values.week_number,
+        assignment_code: values.assignment_code,
         file_url: fileUrl,
         file_name: fileName,
-        created_by: user?.id || '',
+        due_date: values.due_date?.toISOString() || null,
+        is_active: values.is_active,
+        target_classes: values.target_classes,
+        created_by: user?.id || '', // Use actual user ID
       };
 
       let result;
       if (assignment) {
-        // Update existing assignment
-        const updateData: AssignmentUpdate = { ...data };
-        delete (updateData as any).created_by;
-        result = await AssignmentService.updateAssignment(assignment.id, updateData);
+        result = await AssignmentService.updateAssignment(assignment.id, assignmentData);
       } else {
-        // Create new assignment
-        result = await AssignmentService.createAssignment(data as AssignmentInsert);
+        result = await AssignmentService.createAssignment(assignmentData);
       }
 
       if (result.error) {
-        notifications.show({
-          title: 'Error',
-          message: result.error,
-          color: 'red',
-        });
-      } else {
-        notifications.show({
-          title: 'Berhasil',
-          message: assignment ? 'Assignment berhasil diupdate' : 'Assignment berhasil dibuat',
-          color: 'green',
-        });
-        onSuccess?.();
+        throw new Error(result.error);
       }
+
+      notifications.show({
+        title: 'Berhasil',
+        message: assignment ? 'Assignment berhasil diupdate' : 'Assignment berhasil dibuat',
+        color: 'green',
+      });
+      onSuccess?.();
     } catch (error) {
       console.error('Submit error:', error);
       notifications.show({
@@ -224,6 +153,7 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
       });
     } finally {
       setLoading(false);
+      setUploadingFile(false);
     }
   };
 
@@ -261,6 +191,32 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
               )}
             </div>
           </Group>
+
+          {/* NEW: Target Classes Selection */}
+          <div>
+            <Group mb={8}>
+              <IconUsers size={16} />
+              <Text component="label" size="sm" fw={500}>
+                Target Kelas *
+              </Text>
+            </Group>
+            <Text size="xs" c="gray.6" mb={8}>
+              Pilih kelas mana yang dapat mengakses assignment ini
+            </Text>
+
+            <Checkbox.Group value={form.values.target_classes} onChange={handleTargetClassesChange} error={form.errors.target_classes}>
+              <Group>
+                <Checkbox value="A" label="Kelas A" />
+                <Checkbox value="B" label="Kelas B" />
+              </Group>
+            </Checkbox.Group>
+
+            {form.values.target_classes.length > 0 && (
+              <Alert icon={<IconAlertCircle size={16} />} color="blue" variant="light" mt="xs">
+                Assignment akan terlihat untuk: <strong>Kelas {form.values.target_classes.join(' dan Kelas ')}</strong>
+              </Alert>
+            )}
+          </div>
 
           <DateTimePicker label="Deadline (Opsional)" placeholder="Pilih tanggal dan waktu deadline" leftSection={<IconCalendar size={16} />} clearable {...form.getInputProps('due_date')} />
 
