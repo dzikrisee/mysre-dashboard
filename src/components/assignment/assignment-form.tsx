@@ -53,7 +53,6 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
     },
   });
 
-  // Check assignment code availability
   useEffect(() => {
     const checkCode = async () => {
       if (form.values.assignment_code.length >= 3) {
@@ -62,13 +61,15 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
           setCodeError(exists ? 'Code sudah digunakan' : null);
         } catch (error) {
           console.error('Error checking code:', error);
+          setCodeError(null); // Reset error on API failure
         }
       } else {
         setCodeError(null);
       }
     };
 
-    const debounce = setTimeout(checkCode, 500);
+    // OPTIMIZED: Reduced debounce dari 500ms ke 300ms
+    const debounce = setTimeout(checkCode, 300);
     return () => clearTimeout(debounce);
   }, [form.values.assignment_code, assignment?.id]);
 
@@ -98,6 +99,7 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
     form.setFieldValue('target_classes', classes);
   };
 
+  // SIMPLIFIED handleSubmit - hapus semua yang tidak perlu
   const handleSubmit = async (values: typeof form.values) => {
     if (codeError) {
       notifications.show({
@@ -108,7 +110,6 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
       return;
     }
 
-    // Validasi user ID
     if (!user?.id) {
       notifications.show({
         title: 'Error',
@@ -135,27 +136,19 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
         setUploadingFile(false);
       }
 
-      // Fix: Convert null to undefined untuk compatibility dan handle date dengan aman
+      // FIXED: Proper date handling dan null conversion
       const assignmentData = {
         title: values.title,
         description: values.description,
         week_number: values.week_number,
         assignment_code: values.assignment_code,
-        file_url: fileUrl || undefined, // Convert null to undefined
-        file_name: fileName || undefined, // Convert null to undefined
+        file_url: fileUrl || undefined,
+        file_name: fileName || undefined,
         due_date: values.due_date && values.due_date instanceof Date ? values.due_date.toISOString() : undefined, // Safe date handling
         is_active: values.is_active,
-        target_classes: values.target_classes, // Target kelas untuk eksperimen
-        created_by: user.id, // Pastikan user.id valid
+        target_classes: values.target_classes,
+        created_by: user.id,
       };
-
-      // Debug log untuk troubleshoot
-      console.log('User info:', {
-        id: user?.id,
-        email: user?.email,
-        role: user?.role,
-      });
-      console.log('Assignment data:', assignmentData);
 
       let result;
       if (assignment) {
@@ -178,7 +171,7 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
     } catch (error: any) {
       notifications.show({
         title: 'Error',
-        message: error.message || 'Terjadi kesalahan',
+        message: error.message || 'Terjadi kesalahan saat menyimpan assignment',
         color: 'red',
       });
     } finally {

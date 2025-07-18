@@ -1,9 +1,10 @@
-// src/lib/supabase.ts - UPDATED VERSION with Assignment Tables
+// src/lib/supabase.ts - FIXED DATABASE SCHEMA
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
+// FIXED: Updated Database schema sesuai dengan struktur aktual
 export interface Database {
   public: {
     Tables: {
@@ -11,39 +12,13 @@ export interface Database {
         Row: {
           id: string;
           email: string;
+          password: string;
           name: string;
-          role: 'ADMIN' | 'USER';
-          avatar_url: string | null;
-          group: string | null;
-          nim: string | null;
-          phone: string | null;
-          bio: string | null;
-          university: string | null;
-          faculty: string | null;
-          major: string | null;
-          semester: number | null;
-          address: string | null;
-          birthDate: string | null;
-          linkedin: string | null;
-          github: string | null;
-          website: string | null;
-          isEmailVerified: boolean;
-          isPhoneVerified: boolean;
-          lastActive: string | null;
-          token_balance: number;
-          settings: any;
-          createdAt: string;
-          updateAt: string;
-        };
-        Insert: {
-          id: string;
-          email: string;
-          name: string;
-          role?: 'ADMIN' | 'USER';
-          avatar_url?: string | null;
-          group?: string | null;
+          role: 'ADMIN' | 'STUDENT';
           nim?: string | null;
+          group?: string | null;
           phone?: string | null;
+          avatar_url?: string | null;
           bio?: string | null;
           university?: string | null;
           faculty?: string | null;
@@ -59,18 +34,47 @@ export interface Database {
           lastActive?: string | null;
           token_balance?: number;
           settings?: any;
-          createdAt?: string;
-          updateAt?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Insert: {
+          id?: string;
+          email: string;
+          password: string;
+          name: string;
+          role?: 'ADMIN' | 'STUDENT';
+          nim?: string | null;
+          group?: string | null;
+          phone?: string | null;
+          avatar_url?: string | null;
+          bio?: string | null;
+          university?: string | null;
+          faculty?: string | null;
+          major?: string | null;
+          semester?: number | null;
+          address?: string | null;
+          birthDate?: string | null;
+          linkedin?: string | null;
+          github?: string | null;
+          website?: string | null;
+          isEmailVerified?: boolean;
+          isPhoneVerified?: boolean;
+          lastActive?: string | null;
+          token_balance?: number;
+          settings?: any;
+          created_at?: string;
+          updated_at?: string;
         };
         Update: {
           id?: string;
           email?: string;
+          password?: string;
           name?: string;
-          role?: 'ADMIN' | 'USER';
-          avatar_url?: string | null;
-          group?: string | null;
+          role?: 'ADMIN' | 'STUDENT';
           nim?: string | null;
+          group?: string | null;
           phone?: string | null;
+          avatar_url?: string | null;
           bio?: string | null;
           university?: string | null;
           faculty?: string | null;
@@ -86,8 +90,8 @@ export interface Database {
           lastActive?: string | null;
           token_balance?: number;
           settings?: any;
-          createdAt?: string;
-          updateAt?: string;
+          created_at?: string;
+          updated_at?: string;
         };
       };
       Article: {
@@ -95,8 +99,8 @@ export interface Database {
           id: string;
           title: string;
           filePath: string;
-          createdAt: string;
-          updateAt: string;
+          created_at: string;
+          updated_at: string;
           userId: string | null;
           sessionId: string | null;
         };
@@ -104,8 +108,8 @@ export interface Database {
           id?: string;
           title: string;
           filePath: string;
-          createdAt?: string;
-          updateAt?: string;
+          created_at?: string;
+          updated_at?: string;
           userId?: string | null;
           sessionId?: string | null;
         };
@@ -113,13 +117,13 @@ export interface Database {
           id?: string;
           title?: string;
           filePath?: string;
-          createdAt?: string;
-          updateAt?: string;
+          created_at?: string;
+          updated_at?: string;
           userId?: string | null;
           sessionId?: string | null;
         };
       };
-      // NEW ASSIGNMENT TABLES
+      // FIXED: Assignment table sesuai database schema aktual
       Assignment: {
         Row: {
           id: string;
@@ -131,9 +135,10 @@ export interface Database {
           file_name: string | null;
           due_date: string | null;
           is_active: boolean;
+          target_classes: string[]; // Array field
           created_by: string;
-          createdAt: string;
-          updatedAt: string;
+          "createdAt": string; // Quoted camelCase
+          updated_at: string; // Snake case
         };
         Insert: {
           id?: string;
@@ -145,9 +150,10 @@ export interface Database {
           file_name?: string | null;
           due_date?: string | null;
           is_active?: boolean;
+          target_classes: string[];
           created_by: string;
-          createdAt?: string;
-          updatedAt?: string;
+          "createdAt"?: string; // Quoted camelCase
+          updated_at?: string; // Snake case
         };
         Update: {
           id?: string;
@@ -159,9 +165,10 @@ export interface Database {
           file_name?: string | null;
           due_date?: string | null;
           is_active?: boolean;
+          target_classes?: string[];
           created_by?: string;
-          createdAt?: string;
-          updatedAt?: string;
+          "createdAt"?: string; // Quoted camelCase
+          updated_at?: string; // Snake case
         };
       };
       AssignmentSubmission: {
@@ -178,8 +185,8 @@ export interface Database {
           feedback: string | null;
           submitted_at: string;
           graded_at: string | null;
-          createdAt: string;
-          updatedAt: string;
+          created_at: string;
+          updated_at: string; // FIXED: Use snake_case
         };
         Insert: {
           id?: string;
@@ -194,8 +201,8 @@ export interface Database {
           feedback?: string | null;
           submitted_at?: string;
           graded_at?: string | null;
-          createdAt?: string;
-          updatedAt?: string;
+          created_at?: string;
+          updated_at?: string; // FIXED: Use snake_case
         };
         Update: {
           id?: string;
@@ -210,8 +217,8 @@ export interface Database {
           feedback?: string | null;
           submitted_at?: string;
           graded_at?: string | null;
-          createdAt?: string;
-          updatedAt?: string;
+          created_at?: string;
+          updated_at?: string; // FIXED: Use snake_case
         };
       };
     };
@@ -238,7 +245,7 @@ export type UserGroup = Database['public']['Tables']['User']['Row']['group'];
 export type ArticleInsert = Database['public']['Tables']['Article']['Insert'];
 export type ArticleUpdate = Database['public']['Tables']['Article']['Update'];
 
-// NEW: Assignment helper types
+// FIXED: Assignment helper types dengan target_classes
 export type AssignmentRow = Database['public']['Tables']['Assignment']['Row'];
 export type AssignmentInsert = Database['public']['Tables']['Assignment']['Insert'];
 export type AssignmentUpdate = Database['public']['Tables']['Assignment']['Update'];
@@ -247,20 +254,17 @@ export type AssignmentSubmissionRow = Database['public']['Tables']['AssignmentSu
 export type AssignmentSubmissionInsert = Database['public']['Tables']['AssignmentSubmission']['Insert'];
 export type AssignmentSubmissionUpdate = Database['public']['Tables']['AssignmentSubmission']['Update'];
 
-// Existing User helper functions
+// User helper functions - FIXED timestamps
 export const getUserProfile = async (userId: string) => {
   return await supabase.from('User').select('*').eq('id', userId).single();
 };
-
-// Update HANYA bagian helper functions di src/lib/supabase.ts
-// Ganti semua fungsi helper ini dengan versi yang menggunakan updated_at
 
 export const updateUserProfile = async (userId: string, profileData: any) => {
   return await supabase
     .from('User')
     .update({
       ...profileData,
-      updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
+      updated_at: new Date().toISOString(), // FIXED: snake_case
     })
     .eq('id', userId)
     .select('*')
@@ -272,7 +276,7 @@ export const updateUserSettings = async (userId: string, settings: any) => {
     .from('User')
     .update({
       settings,
-      updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
+      updated_at: new Date().toISOString(), // FIXED: snake_case
     })
     .eq('id', userId)
     .select('*')
@@ -284,7 +288,7 @@ export const updateLastActive = async (userId: string) => {
     .from('User')
     .update({
       lastActive: new Date().toISOString(),
-      updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
+      updated_at: new Date().toISOString(), // FIXED: snake_case
     })
     .eq('id', userId);
 };
@@ -294,7 +298,7 @@ export const verifyUserEmail = async (userId: string) => {
     .from('User')
     .update({
       isEmailVerified: true,
-      updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
+      updated_at: new Date().toISOString(), // FIXED: snake_case
     })
     .eq('id', userId);
 };
@@ -304,7 +308,7 @@ export const verifyUserPhone = async (userId: string) => {
     .from('User')
     .update({
       isPhoneVerified: true,
-      updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
+      updated_at: new Date().toISOString(), // FIXED: snake_case
     })
     .eq('id', userId);
 };
@@ -329,9 +333,11 @@ export const uploadUserAvatar = async (userId: string, file: File) => {
     const filePath = `avatars/${fileName}`;
 
     // Upload file to storage
-    const { data: uploadData, error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file, {
-      upsert: true,
-    });
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file, {
+        upsert: true,
+      });
 
     if (uploadError) throw uploadError;
 
@@ -343,7 +349,7 @@ export const uploadUserAvatar = async (userId: string, file: File) => {
       .from('User')
       .update({
         avatar_url: urlData.publicUrl,
-        updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
+        updated_at: new Date().toISOString(), // FIXED: snake_case
       })
       .eq('id', userId)
       .select('*')
@@ -358,42 +364,17 @@ export const uploadUserAvatar = async (userId: string, file: File) => {
   }
 };
 
-// NEW: Assignment helper functions
+// FIXED: Assignment helper functions
 export const createAssignment = async (assignment: AssignmentInsert) => {
   return await supabase
     .from('Assignment')
     .insert({
       ...assignment,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     })
     .select('*')
     .single();
-};
-
-export const getAssignments = async () => {
-  return await supabase
-    .from('Assignment')
-    .select(
-      `
-      *,
-      creator:User!Assignment_created_by_fkey(id, name, email)
-    `,
-    )
-    .order('week_number', { ascending: true });
-};
-
-export const getActiveAssignments = async () => {
-  return await supabase
-    .from('Assignment')
-    .select(
-      `
-      *,
-      creator:User!Assignment_created_by_fkey(id, name, email)
-    `,
-    )
-    .eq('is_active', true)
-    .order('week_number', { ascending: true });
 };
 
 export const updateAssignment = async (id: string, assignment: AssignmentUpdate) => {
@@ -401,99 +382,9 @@ export const updateAssignment = async (id: string, assignment: AssignmentUpdate)
     .from('Assignment')
     .update({
       ...assignment,
-      updatedAt: new Date().toISOString(),
+      updated_at: new Date().toISOString(), // FIXED: snake_case
     })
     .eq('id', id)
     .select('*')
     .single();
-};
-
-export const deleteAssignment = async (id: string) => {
-  return await supabase.from('Assignment').delete().eq('id', id);
-};
-
-// NEW: Assignment Submission helper functions
-export const createSubmission = async (submission: AssignmentSubmissionInsert) => {
-  return await supabase
-    .from('AssignmentSubmission')
-    .insert({
-      ...submission,
-      submitted_at: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    })
-    .select('*')
-    .single();
-};
-
-export const getSubmissions = async () => {
-  return await supabase
-    .from('AssignmentSubmission')
-    .select(
-      `
-      *,
-      assignment:Assignment(id, title, week_number, assignment_code),
-      student:User!AssignmentSubmission_student_id_fkey(id, name, nim, group, email)
-    `,
-    )
-    .order('submitted_at', { ascending: false });
-};
-
-export const updateSubmission = async (id: string, submission: AssignmentSubmissionUpdate) => {
-  return await supabase
-    .from('AssignmentSubmission')
-    .update({
-      ...submission,
-      updatedAt: new Date().toISOString(),
-    })
-    .eq('id', id)
-    .select('*')
-    .single();
-};
-
-export const gradeSubmission = async (id: string, grade: number, feedback?: string) => {
-  return await supabase
-    .from('AssignmentSubmission')
-    .update({
-      grade,
-      feedback,
-      status: 'graded' as const,
-      graded_at: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    })
-    .eq('id', id)
-    .select('*')
-    .single();
-};
-
-// NEW: Storage helpers for assignments
-export const uploadAssignmentFile = async (file: File, path: string) => {
-  try {
-    const { data, error } = await supabase.storage.from('assignments').upload(path, file);
-
-    if (error) throw error;
-
-    const { data: urlData } = supabase.storage.from('assignments').getPublicUrl(path);
-
-    return {
-      data: {
-        path: data.path,
-        url: urlData.publicUrl,
-      },
-      error: null,
-    };
-  } catch (error: any) {
-    return { data: null, error: error.message };
-  }
-};
-
-export const deleteAssignmentFile = async (path: string) => {
-  try {
-    const { error } = await supabase.storage.from('assignments').remove([path]);
-
-    if (error) throw error;
-    return { success: true, error: null };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
 };
