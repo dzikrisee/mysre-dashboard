@@ -1,16 +1,38 @@
-// src/app/dashboard/assignments/[id]/submissions/page.tsx
+// src/app/dashboard/assignments/[id]/page.tsx - FIXED VERSION
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Container, Paper, Stack, Group, Title, Text, Badge, Button, Card, Table, ScrollArea, ActionIcon, Alert, LoadingOverlay, Avatar, ThemeIcon, SimpleGrid } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
-import { IconArrowLeft, IconUsers, IconFileText, IconClock, IconTrophy, IconGrain, IconDownload, IconUser, IconCalendar, IconAlertCircle, IconCheck, IconX } from '@tabler/icons-react';
+import { Container, Stack, Title, Text, Group, Badge, Button, Card, SimpleGrid, ThemeIcon, LoadingOverlay, Alert, Breadcrumbs, Anchor, Divider, ActionIcon, Menu, Tabs, Paper, Box, Progress, Tooltip } from '@mantine/core';
+import {
+  IconArrowLeft,
+  IconEdit,
+  IconTrash,
+  IconDownload,
+  IconUsers,
+  IconCalendar,
+  IconCode,
+  IconFile,
+  IconClipboardList,
+  IconStar,
+  IconClock,
+  IconCheck,
+  IconAlertCircle,
+  IconToggleLeft,
+  IconToggleRight,
+  IconChartBar,
+  IconEye,
+  IconDots,
+} from '@tabler/icons-react';
+import { useAuth } from '@/providers/auth-provider';
 import { AssignmentService } from '@/lib/services/assignment.service';
-import { useAuth } from '@/hooks/useAuth';
-import type { Assignment, AssignmentSubmission } from '@/lib/types/assignment';
+import { Assignment, AssignmentSubmission } from '@/lib/types/assignment';
+import { SubmissionList } from '@/components/assignment/submission-list';
+import { AssignmentForm } from '@/components/assignment/assignment-form';
+import { notifications } from '@mantine/notifications';
+import { modals } from '@mantine/modals';
 
-export default function AssignmentSubmissionsPage() {
+export default function AssignmentDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
@@ -19,52 +41,42 @@ export default function AssignmentSubmissionsPage() {
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [submissions, setSubmissions] = useState<AssignmentSubmission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalSubmissions: 0,
-    pendingSubmissions: 0,
-    gradedSubmissions: 0,
-    averageGrade: 0,
-  });
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [activeTab, setActiveTab] = useState<string | null>('overview');
 
   useEffect(() => {
-    loadData();
+    if (assignmentId) {
+      loadAssignmentData();
+    }
   }, [assignmentId]);
 
-  const loadData = async () => {
+  const loadAssignmentData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
+      const [assignmentResult, submissionsResult] = await Promise.all([AssignmentService.getAssignmentById(assignmentId), AssignmentService.getSubmissionsByAssignment(assignmentId)]);
 
-      // Load assignment details
-      const assignmentResult = await AssignmentService.getAssignmentById(assignmentId);
       if (assignmentResult.error) {
-        throw new Error(assignmentResult.error);
+        console.error('Error loading assignment:', assignmentResult.error);
+        notifications.show({
+          title: 'Error',
+          message: 'Assignment tidak ditemukan',
+          color: 'red',
+        });
+        router.push('/dashboard/assignments');
+        return;
       }
 
-      // Load submissions for this assignment
-      const submissionsResult = await AssignmentService.getSubmissionsByAssignment(assignmentId);
       if (submissionsResult.error) {
-        throw new Error(submissionsResult.error);
+        console.error('Error loading submissions:', submissionsResult.error);
       }
 
       setAssignment(assignmentResult.data);
       setSubmissions(submissionsResult.data || []);
-
-      // Calculate stats
-      const allSubmissions = submissionsResult.data || [];
-      const gradedSubmissions = allSubmissions.filter((s) => s.status === 'graded');
-      const averageGrade = gradedSubmissions.length > 0 ? gradedSubmissions.reduce((acc, s) => acc + (s.grade || 0), 0) / gradedSubmissions.length : 0;
-
-      setStats({
-        totalSubmissions: allSubmissions.length,
-        pendingSubmissions: allSubmissions.filter((s) => s.status === 'submitted').length,
-        gradedSubmissions: gradedSubmissions.length,
-        averageGrade: Math.round(averageGrade * 10) / 10,
-      });
     } catch (error) {
       console.error('Error loading data:', error);
       notifications.show({
         title: 'Error',
-        message: 'Gagal memuat data submissions',
+        message: 'Gagal memuat data assignment',
         color: 'red',
       });
     } finally {
@@ -72,52 +84,89 @@ export default function AssignmentSubmissionsPage() {
     }
   };
 
-  const handleGradeSubmission = (submission: AssignmentSubmission) => {
-    router.push(`/dashboard/assignments/grade/${submission.id}`);
-  };
+  const handleToggleStatus = async () => {
+    if (!assignment) return;
 
-  const downloadFile = (url: string, filename: string) => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+    try {
+      const result = await AssignmentService.updateAssignment(assignment.id, {
+        is_active: !assignment.is_active,
+      });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'graded':
-        return 'green';
-      case 'submitted':
-        return 'blue';
-      case 'pending':
-        return 'gray';
-      default:
-        return 'gray';
+      if (result.error) {
+        notifications.show({
+          title: 'Error',
+          message: result.error,
+          color: 'red',
+        });
+      } else {
+        notifications.show({
+          title: 'Berhasil',
+          message: `Assignment ${assignment.is_active ? 'dinonaktifkan' : 'diaktifkan'}`,
+          color: 'green',
+        });
+        await loadAssignmentData();
+      }
+    } catch (error) {
+      notifications.show({
+        title: 'Error',
+        message: 'Gagal mengubah status assignment',
+        color: 'red',
+      });
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'graded':
-        return 'Sudah Dinilai';
-      case 'submitted':
-        return 'Menunggu Penilaian';
-      case 'pending':
-        return 'Belum Dikumpulkan';
-      default:
-        return status;
+  const handleDeleteAssignment = () => {
+    if (!assignment) return;
+
+    modals.openConfirmModal({
+      title: 'Hapus Assignment',
+      children: (
+        <Text size="sm">
+          Apakah Anda yakin ingin menghapus assignment <strong>{assignment.title}</strong>? Semua submission yang terkait juga akan terhapus. Tindakan ini tidak dapat dibatalkan.
+        </Text>
+      ),
+      labels: { confirm: 'Hapus', cancel: 'Batal' },
+      confirmProps: { color: 'red' },
+      onConfirm: async () => {
+        const result = await AssignmentService.deleteAssignment(assignment.id);
+        if (result.error) {
+          notifications.show({
+            title: 'Error',
+            message: result.error,
+            color: 'red',
+          });
+        } else {
+          notifications.show({
+            title: 'Berhasil',
+            message: 'Assignment berhasil dihapus',
+            color: 'green',
+          });
+          router.push('/dashboard/assignments');
+        }
+      },
+    });
+  };
+
+  const handleFormSuccess = () => {
+    setShowEditForm(false);
+    loadAssignmentData();
+  };
+
+  const downloadFile = () => {
+    if (assignment?.file_url) {
+      window.open(assignment.file_url, '_blank');
     }
   };
 
-  const getGradeColor = (grade: number) => {
-    if (grade >= 85) return 'green';
-    if (grade >= 70) return 'blue';
-    if (grade >= 60) return 'orange';
-    return 'red';
-  };
+  // Calculate statistics with safe null checking
+  const totalSubmissions = submissions.length;
+  const submittedCount = submissions.filter((s) => s.status === 'submitted').length;
+  const gradedCount = submissions.filter((s) => s.status === 'graded').length;
+  const pendingCount = submissions.filter((s) => s.status === 'pending').length;
+
+  // Safe calculation for average grade
+  const gradedSubmissions = submissions.filter((s) => s.grade !== null && s.grade !== undefined);
+  const averageGrade = gradedSubmissions.length > 0 ? gradedSubmissions.reduce((acc, s) => acc + (s.grade as number), 0) / gradedSubmissions.length : 0;
 
   // Check admin access
   if (!user || user.role !== 'ADMIN') {
@@ -150,278 +199,355 @@ export default function AssignmentSubmissionsPage() {
 
   return (
     <Container size="xl" py="xl">
+      <LoadingOverlay visible={loading} />
+
       <Stack gap="xl">
+        {/* Breadcrumbs */}
+        <Breadcrumbs>
+          <Anchor onClick={() => router.push('/dashboard/assignments')} style={{ cursor: 'pointer' }}>
+            Assignments
+          </Anchor>
+          <Text>{assignment.title}</Text>
+        </Breadcrumbs>
+
         {/* Header */}
         <Group justify="space-between">
           <Group>
-            <ActionIcon variant="light" size="lg" onClick={() => router.push('/dashboard/assignments')}>
+            <ActionIcon variant="subtle" color="gray" onClick={() => router.push('/dashboard/assignments')}>
               <IconArrowLeft size={20} />
             </ActionIcon>
             <div>
-              <Title order={2}>Kelola Submissions</Title>
-              <Text c="gray.6">
-                {assignment.title} - Minggu {assignment.week_number}
-              </Text>
+              <Title order={2}>{assignment.title}</Title>
+              <Group gap="xs" mt={4}>
+                <Badge size="sm" variant="light" color="blue">
+                  Minggu {assignment.week_number}
+                </Badge>
+                <Badge size="sm" variant="light" color="violet" leftSection={<IconCode size={12} />}>
+                  {assignment.assignment_code}
+                </Badge>
+                <Badge size="sm" color={assignment.is_active ? 'green' : 'gray'} variant="light">
+                  {assignment.is_active ? 'Aktif' : 'Nonaktif'}
+                </Badge>
+                {assignment.due_date && (
+                  <Badge size="sm" variant="light" color="orange" leftSection={<IconCalendar size={12} />}>
+                    {new Date(assignment.due_date).toLocaleDateString('id-ID', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Badge>
+                )}
+              </Group>
             </div>
           </Group>
 
           <Group>
-            <Badge leftSection={<IconUsers size={12} />} variant="light" color="blue" size="lg">
-              {assignment.target_classes?.join(' & ') || 'Semua Kelas'}
-            </Badge>
+            <Tooltip label={assignment.is_active ? 'Nonaktifkan Assignment' : 'Aktifkan Assignment'}>
+              <ActionIcon variant="light" color={assignment.is_active ? 'orange' : 'green'} onClick={handleToggleStatus} size="lg">
+                {assignment.is_active ? <IconToggleRight size={20} /> : <IconToggleLeft size={20} />}
+              </ActionIcon>
+            </Tooltip>
+
+            <Button leftSection={<IconEdit size={16} />} variant="light" onClick={() => setShowEditForm(true)}>
+              Edit
+            </Button>
+
+            <Menu shadow="md" width={200}>
+              <Menu.Target>
+                <ActionIcon variant="light" color="gray" size="lg">
+                  <IconDots size={20} />
+                </ActionIcon>
+              </Menu.Target>
+              <Menu.Dropdown>
+                {assignment.file_url && (
+                  <Menu.Item leftSection={<IconDownload size={16} />} onClick={downloadFile}>
+                    Download File
+                  </Menu.Item>
+                )}
+                <Menu.Divider />
+                <Menu.Item leftSection={<IconTrash size={16} />} color="red" onClick={handleDeleteAssignment}>
+                  Hapus Assignment
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
           </Group>
         </Group>
 
-        {/* Assignment Info */}
-        <Card withBorder shadow="sm" radius="md" p="lg">
-          <Group justify="space-between" mb="md">
-            <Title order={4}>Informasi Assignment</Title>
-            <Badge variant="light" color="gray" tt="uppercase" fw={600}>
-              {assignment.assignment_code}
-            </Badge>
-          </Group>
+        {/* Edit Form */}
+        {showEditForm && (
+          <Paper withBorder shadow="sm" radius="md" p="xl">
+            <AssignmentForm assignment={assignment} onSuccess={handleFormSuccess} onCancel={() => setShowEditForm(false)} />
+          </Paper>
+        )}
 
-          <Text size="sm" c="gray.7" mb="md">
-            {assignment.description}
-          </Text>
+        {/* Tabs */}
+        <Tabs value={activeTab} onChange={setActiveTab}>
+          <Tabs.List>
+            <Tabs.Tab value="overview" leftSection={<IconEye size={16} />}>
+              Overview
+            </Tabs.Tab>
+            <Tabs.Tab value="submissions" leftSection={<IconUsers size={16} />}>
+              Submissions ({totalSubmissions})
+            </Tabs.Tab>
+            <Tabs.Tab value="analytics" leftSection={<IconChartBar size={16} />}>
+              Analytics
+            </Tabs.Tab>
+          </Tabs.List>
 
-          <Group>
-            {assignment.due_date && (
-              <Group gap="xs">
-                <IconCalendar size={14} color="var(--mantine-color-gray-6)" />
-                <Text size="sm" c="gray.6">
-                  Deadline:{' '}
-                  {new Date(assignment.due_date).toLocaleDateString('id-ID', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </Text>
-              </Group>
-            )}
+          <Tabs.Panel value="overview" pt="xl">
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl">
+              {/* Assignment Details */}
+              <Card withBorder shadow="sm" radius="md" p="lg">
+                <Title order={4} mb="md">
+                  Detail Assignment
+                </Title>
+                <Stack gap="md">
+                  <div>
+                    <Text size="sm" c="gray.6" mb={4}>
+                      Deskripsi:
+                    </Text>
+                    <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                      {assignment.description}
+                    </Text>
+                  </div>
 
-            {assignment.file_url && (
-              <Button variant="subtle" size="xs" leftSection={<IconDownload size={12} />} onClick={() => downloadFile(assignment.file_url!, assignment.file_name || 'assignment-file')}>
-                Download File Assignment
-              </Button>
-            )}
-          </Group>
-        </Card>
-
-        {/* Stats Overview */}
-        <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
-          <Card withBorder shadow="sm" radius="md" p="lg">
-            <Group justify="space-between">
-              <div>
-                <Text c="gray.6" size="sm" fw={700} tt="uppercase">
-                  Total Submissions
-                </Text>
-                <Text fw={700} size="xl">
-                  {stats.totalSubmissions}
-                </Text>
-              </div>
-              <ThemeIcon color="blue" variant="light" size="xl" radius="md">
-                <IconFileText size={28} />
-              </ThemeIcon>
-            </Group>
-          </Card>
-
-          <Card withBorder shadow="sm" radius="md" p="lg">
-            <Group justify="space-between">
-              <div>
-                <Text c="gray.6" size="sm" fw={700} tt="uppercase">
-                  Menunggu Penilaian
-                </Text>
-                <Text fw={700} size="xl">
-                  {stats.pendingSubmissions}
-                </Text>
-              </div>
-              <ThemeIcon color="orange" variant="light" size="xl" radius="md">
-                <IconClock size={28} />
-              </ThemeIcon>
-            </Group>
-          </Card>
-
-          <Card withBorder shadow="sm" radius="md" p="lg">
-            <Group justify="space-between">
-              <div>
-                <Text c="gray.6" size="sm" fw={700} tt="uppercase">
-                  Sudah Dinilai
-                </Text>
-                <Text fw={700} size="xl">
-                  {stats.gradedSubmissions}
-                </Text>
-              </div>
-              <ThemeIcon color="green" variant="light" size="xl" radius="md">
-                <IconCheck size={28} />
-              </ThemeIcon>
-            </Group>
-          </Card>
-
-          <Card withBorder shadow="sm" radius="md" p="lg">
-            <Group justify="space-between">
-              <div>
-                <Text c="gray.6" size="sm" fw={700} tt="uppercase">
-                  Rata-rata Nilai
-                </Text>
-                <Text fw={700} size="xl">
-                  {stats.averageGrade}
-                </Text>
-              </div>
-              <ThemeIcon color={getGradeColor(stats.averageGrade)} variant="light" size="xl" radius="md">
-                <IconTrophy size={28} />
-              </ThemeIcon>
-            </Group>
-          </Card>
-        </SimpleGrid>
-
-        {/* Submissions Table */}
-        <Paper withBorder shadow="sm" radius="md">
-          <ScrollArea>
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Mahasiswa</Table.Th>
-                  <Table.Th>Kelas</Table.Th>
-                  <Table.Th>Waktu Submit</Table.Th>
-                  <Table.Th>Status</Table.Th>
-                  <Table.Th>Nilai</Table.Th>
-                  <Table.Th>File</Table.Th>
-                  <Table.Th>Aksi</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {submissions.map((submission) => (
-                  <Table.Tr key={submission.id}>
-                    <Table.Td>
-                      <Group>
-                        <Avatar size="sm" color="blue">
-                          <IconUser size={16} />
-                        </Avatar>
-                        <div>
-                          <Text fw={500} size="sm">
-                            {submission.student?.name}
-                          </Text>
-                          <Text size="xs" c="gray.6">
-                            NIM: {submission.student?.nim}
-                          </Text>
-                          <Text size="xs" c="gray.6">
-                            {submission.student?.email}
-                          </Text>
-                        </div>
-                      </Group>
-                    </Table.Td>
-
-                    <Table.Td>
-                      <Badge variant="light" size="sm">
-                        Kelas {submission.student?.group}
-                      </Badge>
-                    </Table.Td>
-
-                    <Table.Td>
-                      <Text size="sm">
-                        {new Date(submission.submitted_at).toLocaleDateString('id-ID', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                  {assignment.file_url && (
+                    <div>
+                      <Text size="sm" c="gray.6" mb={4}>
+                        File Assignment:
                       </Text>
-                    </Table.Td>
-
-                    <Table.Td>
-                      <Badge
-                        variant="light"
-                        color={getStatusColor(submission.status)}
-                        leftSection={submission.status === 'graded' ? <IconCheck size={12} /> : submission.status === 'submitted' ? <IconClock size={12} /> : <IconX size={12} />}
-                      >
-                        {getStatusLabel(submission.status)}
-                      </Badge>
-                    </Table.Td>
-
-                    <Table.Td>
-                      {submission.grade !== null && submission.grade !== undefined ? (
-                        <Badge variant="light" color={getGradeColor(submission.grade)} size="lg" leftSection={<IconTrophy size={12} />}>
-                          {submission.grade}
-                        </Badge>
-                      ) : (
-                        <Text size="sm" c="gray.5">
-                          Belum dinilai
-                        </Text>
-                      )}
-                    </Table.Td>
-
-                    <Table.Td>
                       <Group gap="xs">
-                        {submission.file_url ? (
-                          <ActionIcon variant="light" color="blue" size="sm" onClick={() => downloadFile(submission.file_url!, submission.file_name || 'submission-file')} title="Download File Submission">
-                            <IconDownload size={16} />
-                          </ActionIcon>
-                        ) : (
-                          <Text size="xs" c="gray.5">
-                            Text only
-                          </Text>
+                        <IconFile size={16} />
+                        <Anchor onClick={downloadFile} style={{ cursor: 'pointer' }}>
+                          {assignment.file_name}
+                        </Anchor>
+                      </Group>
+                    </div>
+                  )}
+
+                  <div>
+                    <Text size="sm" c="gray.6" mb={4}>
+                      Dibuat oleh:
+                    </Text>
+                    <Text size="sm">{assignment.creator?.name}</Text>
+                  </div>
+
+                  <div>
+                    <Text size="sm" c="gray.6" mb={4}>
+                      Tanggal dibuat:
+                    </Text>
+                    <Text size="sm">
+                      {new Date(assignment.createdAt).toLocaleDateString('id-ID', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </Text>
+                  </div>
+                </Stack>
+              </Card>
+
+              {/* Statistics */}
+              <Card withBorder shadow="sm" radius="md" p="lg">
+                <Title order={4} mb="md">
+                  Statistik Submission
+                </Title>
+                <SimpleGrid cols={2} spacing="md">
+                  <div>
+                    <Group justify="space-between" mb="xs">
+                      <Text size="sm" c="gray.6">
+                        Total Submission
+                      </Text>
+                      <Text size="sm" fw={600}>
+                        {totalSubmissions}
+                      </Text>
+                    </Group>
+                    <Progress value={(totalSubmissions / Math.max(totalSubmissions, 1)) * 100} color="blue" size="sm" />
+                  </div>
+
+                  <div>
+                    <Group justify="space-between" mb="xs">
+                      <Text size="sm" c="gray.6">
+                        Dikumpulkan
+                      </Text>
+                      <Text size="sm" fw={600}>
+                        {submittedCount}
+                      </Text>
+                    </Group>
+                    <Progress value={totalSubmissions > 0 ? (submittedCount / totalSubmissions) * 100 : 0} color="green" size="sm" />
+                  </div>
+
+                  <div>
+                    <Group justify="space-between" mb="xs">
+                      <Text size="sm" c="gray.6">
+                        Perlu Review
+                      </Text>
+                      <Text size="sm" fw={600}>
+                        {submittedCount}
+                      </Text>
+                    </Group>
+                    <Progress value={totalSubmissions > 0 ? (submittedCount / totalSubmissions) * 100 : 0} color="orange" size="sm" />
+                  </div>
+
+                  <div>
+                    <Group justify="space-between" mb="xs">
+                      <Text size="sm" c="gray.6">
+                        Sudah Dinilai
+                      </Text>
+                      <Text size="sm" fw={600}>
+                        {gradedCount}
+                      </Text>
+                    </Group>
+                    <Progress value={totalSubmissions > 0 ? (gradedCount / totalSubmissions) * 100 : 0} color="teal" size="sm" />
+                  </div>
+                </SimpleGrid>
+
+                {gradedCount > 0 && (
+                  <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'var(--mantine-color-gray-0)', borderRadius: '8px' }}>
+                    <Group justify="space-between">
+                      <Text size="sm" c="gray.6">
+                        Nilai Rata-rata:
+                      </Text>
+                      <Badge size="lg" color={averageGrade >= 80 ? 'green' : averageGrade >= 60 ? 'orange' : 'red'}>
+                        {averageGrade.toFixed(1)}
+                      </Badge>
+                    </Group>
+                  </div>
+                )}
+              </Card>
+            </SimpleGrid>
+
+            {/* Recent Submissions Preview */}
+            <Card withBorder shadow="sm" radius="md" p="lg" mt="xl">
+              <Group justify="space-between" mb="md">
+                <Title order={4}>Submission Terbaru</Title>
+                <Button variant="light" size="sm" onClick={() => setActiveTab('submissions')}>
+                  Lihat Semua
+                </Button>
+              </Group>
+
+              {submissions.length === 0 ? (
+                <Box p="xl" ta="center">
+                  <IconUsers size={48} color="var(--mantine-color-gray-4)" />
+                  <Text c="gray.5" mt="md">
+                    Belum ada submission
+                  </Text>
+                </Box>
+              ) : (
+                <Stack gap="sm">
+                  {submissions.slice(0, 5).map((submission) => (
+                    <Group key={submission.id} justify="space-between" p="sm" style={{ borderRadius: '8px', backgroundColor: 'var(--mantine-color-gray-0)' }}>
+                      <div>
+                        <Text fw={500} size="sm">
+                          {submission.student?.name}
+                        </Text>
+                        <Text size="xs" c="gray.6">
+                          {submission.student?.nim}
+                        </Text>
+                      </div>
+                      <Group gap="xs">
+                        <Badge size="sm" color={submission.status === 'graded' ? 'green' : submission.status === 'submitted' ? 'blue' : 'gray'} variant="light">
+                          {submission.status === 'graded' ? 'Dinilai' : submission.status === 'submitted' ? 'Dikumpulkan' : 'Pending'}
+                        </Badge>
+                        {submission.grade !== null && submission.grade !== undefined && (
+                          <Badge size="sm" color={submission.grade >= 80 ? 'green' : submission.grade >= 60 ? 'orange' : 'red'}>
+                            {submission.grade}
+                          </Badge>
                         )}
                       </Group>
-                    </Table.Td>
+                    </Group>
+                  ))}
+                </Stack>
+              )}
+            </Card>
+          </Tabs.Panel>
 
-                    <Table.Td>
-                      <Button
-                        size="xs"
-                        variant={submission.status === 'graded' ? 'light' : 'filled'}
-                        color={submission.status === 'graded' ? 'green' : 'blue'}
-                        leftSection={<IconGrain size={14} />}
-                        onClick={() => handleGradeSubmission(submission)}
-                      >
-                        {submission.status === 'graded' ? 'Edit Nilai' : 'Beri Nilai'}
-                      </Button>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </ScrollArea>
+          <Tabs.Panel value="submissions" pt="xl">
+            <SubmissionList submissions={submissions} onRefresh={loadAssignmentData} />
+          </Tabs.Panel>
 
-          {submissions.length === 0 && !loading && (
-            <Stack align="center" gap="md" p="xl">
-              <IconFileText size={48} color="var(--mantine-color-gray-4)" />
-              <div style={{ textAlign: 'center' }}>
-                <Text fw={600} size="lg" mb={4}>
-                  Belum Ada Submission
-                </Text>
-                <Text c="gray.6" size="sm">
-                  Submission dari mahasiswa akan muncul di sini setelah mereka mengumpulkan tugas
-                </Text>
-              </div>
-            </Stack>
-          )}
-        </Paper>
+          <Tabs.Panel value="analytics" pt="xl">
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl">
+              <Card withBorder shadow="sm" radius="md" p="lg">
+                <Title order={4} mb="md">
+                  Distribusi Status
+                </Title>
+                <Stack gap="md">
+                  <Group justify="space-between">
+                    <Group gap="xs">
+                      <ThemeIcon size="sm" color="gray" variant="light">
+                        <IconClock size={14} />
+                      </ThemeIcon>
+                      <Text size="sm">Pending</Text>
+                    </Group>
+                    <Text size="sm" fw={600}>
+                      {pendingCount}
+                    </Text>
+                  </Group>
+                  <Group justify="space-between">
+                    <Group gap="xs">
+                      <ThemeIcon size="sm" color="blue" variant="light">
+                        <IconClipboardList size={14} />
+                      </ThemeIcon>
+                      <Text size="sm">Dikumpulkan</Text>
+                    </Group>
+                    <Text size="sm" fw={600}>
+                      {submittedCount}
+                    </Text>
+                  </Group>
+                  <Group justify="space-between">
+                    <Group gap="xs">
+                      <ThemeIcon size="sm" color="green" variant="light">
+                        <IconCheck size={14} />
+                      </ThemeIcon>
+                      <Text size="sm">Dinilai</Text>
+                    </Group>
+                    <Text size="sm" fw={600}>
+                      {gradedCount}
+                    </Text>
+                  </Group>
+                </Stack>
+              </Card>
 
-        {/* Quick Actions */}
-        <Card withBorder shadow="sm" radius="md" p="lg">
-          <Group justify="space-between">
-            <div>
-              <Text fw={600} size="md" mb="xs">
-                Quick Actions
-              </Text>
-              <Text size="sm" c="gray.6">
-                Kelola assignment dan submissions dengan cepat
-              </Text>
-            </div>
-            <Group>
-              <Button variant="light" leftSection={<IconFileText size={16} />} onClick={() => router.push(`/dashboard/assignments/${assignment.id}`)}>
-                Edit Assignment
-              </Button>
-              <Button variant="light" leftSection={<IconArrowLeft size={16} />} onClick={() => router.push('/dashboard/assignments')}>
-                Kembali ke Daftar
-              </Button>
-            </Group>
-          </Group>
-        </Card>
+              <Card withBorder shadow="sm" radius="md" p="lg">
+                <Title order={4} mb="md">
+                  Distribusi Nilai
+                </Title>
+                {gradedCount === 0 ? (
+                  <Text c="gray.5" ta="center" py="xl">
+                    Belum ada nilai yang diberikan
+                  </Text>
+                ) : (
+                  <Stack gap="md">
+                    <Group justify="space-between">
+                      <Text size="sm">A (≥80)</Text>
+                      <Text size="sm" fw={600}>
+                        {submissions.filter((s) => s.grade !== null && s.grade !== undefined && s.grade >= 80).length}
+                      </Text>
+                    </Group>
+                    <Group justify="space-between">
+                      <Text size="sm">B (60-79)</Text>
+                      <Text size="sm" fw={600}>
+                        {submissions.filter((s) => s.grade !== null && s.grade !== undefined && s.grade >= 60 && s.grade < 80).length}
+                      </Text>
+                    </Group>
+                    <Group justify="space-between">
+                      <Text size="sm">C (&lt;60)</Text>
+                      <Text size="sm" fw={600}>
+                        {submissions.filter((s) => s.grade !== null && s.grade !== undefined && s.grade < 60).length}
+                      </Text>
+                    </Group>
+                  </Stack>
+                )}
+              </Card>
+            </SimpleGrid>
+          </Tabs.Panel>
+        </Tabs>
       </Stack>
     </Container>
   );

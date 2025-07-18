@@ -13,6 +13,7 @@ interface UserProfile {
   group?: string;
   nim?: string;
   avatar_url?: string;
+  token_balance?: number;
   created_at: string;
   updated_at: string;
 }
@@ -23,6 +24,8 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  isAdmin: () => boolean;
+  isStudent: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -123,12 +126,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Helper functions
+  const isAdmin = () => {
+    return user?.role === 'ADMIN';
+  };
+
+  const isStudent = () => {
+    return user?.role === 'user' || user?.role === 'USER';
+  };
+
   const value = {
     user,
     loading,
     signIn,
     signOut,
     refreshUser,
+    isAdmin,
+    isStudent,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
