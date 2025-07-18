@@ -1,5 +1,5 @@
 // src/lib/services/assignment.service.ts
-// Unified service untuk Admin dan Student Assignment - FIXED updatedAt error
+// COMPLETE FIX: Hapus SEMUA reference ke updatedAt/updated_at
 
 import { supabase } from '@/lib/supabase';
 
@@ -18,17 +18,75 @@ export class AssignmentService {
     file_name?: string;
     due_date?: string;
     is_active?: boolean;
-    target_classes: string[]; // NEW
+    target_classes: string[];
     created_by: string;
   }) {
     try {
       const { data: assignment, error } = await supabase
         .from('Assignment')
         .insert({
-          ...data,
+          title: data.title,
+          description: data.description,
+          week_number: data.week_number,
+          assignment_code: data.assignment_code,
+          file_url: data.file_url || null,
+          file_name: data.file_name || null,
+          due_date: data.due_date || null,
+          is_active: data.is_active ?? true,
+          target_classes: data.target_classes,
+          created_by: data.created_by,
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(), // FIXED: Gunakan updatedAt, bukan updated_at
         })
+        .select(
+          `
+          *,
+          creator:User!Assignment_created_by_fkey(id, name, email)
+        `,
+        )
+        .single();
+
+      if (error) throw error;
+      return { data: assignment, error: null };
+    } catch (error: any) {
+      return { data: null, error: error.message };
+    }
+  }
+
+  /**
+   * Update assignment (Admin only)
+   */
+  static async updateAssignment(
+    id: string,
+    data: {
+      title?: string;
+      description?: string;
+      week_number?: number;
+      assignment_code?: string;
+      file_url?: string;
+      file_name?: string;
+      due_date?: string;
+      is_active?: boolean;
+      target_classes?: string[];
+    },
+  ) {
+    try {
+      // Build update object WITHOUT any timestamp fields
+      const updateData: any = {};
+
+      if (data.title !== undefined) updateData.title = data.title;
+      if (data.description !== undefined) updateData.description = data.description;
+      if (data.week_number !== undefined) updateData.week_number = data.week_number;
+      if (data.assignment_code !== undefined) updateData.assignment_code = data.assignment_code;
+      if (data.file_url !== undefined) updateData.file_url = data.file_url;
+      if (data.file_name !== undefined) updateData.file_name = data.file_name;
+      if (data.due_date !== undefined) updateData.due_date = data.due_date;
+      if (data.is_active !== undefined) updateData.is_active = data.is_active;
+      if (data.target_classes !== undefined) updateData.target_classes = data.target_classes;
+
+      const { data: assignment, error } = await supabase
+        .from('Assignment')
+        .update(updateData)
+        .eq('id', id)
         .select(
           `
           *,
@@ -80,7 +138,7 @@ export class AssignmentService {
         `,
         )
         .eq('is_active', true)
-        .contains('target_classes', [studentClass]) // Filter by target classes
+        .contains('target_classes', [studentClass])
         .order('week_number', { ascending: true });
 
       if (error) throw error;
@@ -91,81 +149,20 @@ export class AssignmentService {
   }
 
   /**
-   * Update assignment (Admin only)
-   */
-  static async updateAssignment(
-    id: string,
-    data: {
-      title?: string;
-      description?: string;
-      week_number?: number;
-      assignment_code?: string;
-      file_url?: string;
-      file_name?: string;
-      due_date?: string;
-      is_active?: boolean;
-      target_classes?: string[]; // NEW
-    },
-  ) {
-    try {
-      const { data: assignment, error } = await supabase
-        .from('Assignment')
-        .update({
-          ...data,
-          updatedAt: new Date().toISOString(), // FIXED: Gunakan updatedAt, bukan updated_at
-        })
-        .eq('id', id)
-        .select(
-          `
-          *,
-          creator:User!Assignment_created_by_fkey(id, name, email)
-        `,
-        )
-        .single();
-
-      if (error) throw error;
-      return { data: assignment, error: null };
-    } catch (error: any) {
-      return { data: null, error: error.message };
-    }
-  }
-
-  /**
    * Delete assignment (Admin only)
    */
   static async deleteAssignment(id: string) {
     try {
+      // First delete all submissions for this assignment
+      await supabase.from('AssignmentSubmission').delete().eq('assignment_id', id);
+
+      // Then delete the assignment
       const { error } = await supabase.from('Assignment').delete().eq('id', id);
 
       if (error) throw error;
-      return { success: true, error: null };
+      return { data: true, error: null };
     } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Check if assignment code exists
-   */
-  static async checkAssignmentCodeExists(code: string, excludeId?: string): Promise<boolean> {
-    try {
-      let query = supabase.from('Assignment').select('id').eq('assignment_code', code);
-
-      if (excludeId) {
-        query = query.neq('id', excludeId);
-      }
-
-      const { data, error } = await query.single();
-
-      if (error && error.code !== 'PGRST116') {
-        // PGRST116 = no rows found
-        throw error;
-      }
-
-      return !!data;
-    } catch (error: any) {
-      console.error('Error checking assignment code:', error);
-      return false;
+      return { data: null, error: error.message };
     }
   }
 
@@ -179,7 +176,11 @@ export class AssignmentService {
         .select(
           `
           *,
-          creator:User!Assignment_created_by_fkey(id, name, email)
+          creator:User!Assignment_created_by_fkey(id, name, email),
+          submissions:AssignmentSubmission(
+            *,
+            student:User!AssignmentSubmission_student_id_fkey(id, name, email, nim, group)
+          )
         `,
         )
         .eq('id', id)
@@ -192,40 +193,77 @@ export class AssignmentService {
     }
   }
 
+  /**
+   * Check if assignment code exists
+   */
+  static async checkAssignmentCodeExists(code: string, excludeId?: string) {
+    try {
+      let query = supabase.from('Assignment').select('id').eq('assignment_code', code);
+
+      if (excludeId) {
+        query = query.neq('id', excludeId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      return data && data.length > 0;
+    } catch (error: any) {
+      console.error('Error checking assignment code:', error);
+      return false;
+    }
+  }
+
   // ==================== STUDENT METHODS ====================
+
+  /**
+   * Get assignment by code (Student view)
+   */
+  static async getAssignmentByCode(code: string, studentClass: string) {
+    try {
+      const { data: assignment, error } = await supabase
+        .from('Assignment')
+        .select(
+          `
+          *,
+          creator:User!Assignment_created_by_fkey(id, name, email)
+        `,
+        )
+        .eq('assignment_code', code)
+        .eq('is_active', true)
+        .contains('target_classes', [studentClass])
+        .single();
+
+      if (error) throw error;
+      return { data: assignment, error: null };
+    } catch (error: any) {
+      return { data: null, error: error.message };
+    }
+  }
 
   /**
    * Submit assignment (Student only)
    */
   static async submitAssignment(data: { assignment_id: string; student_id: string; assignment_code_input: string; file_url?: string; file_name?: string; submission_text?: string }) {
     try {
-      // First verify assignment code
-      const { data: assignment } = await this.getAssignmentById(data.assignment_id);
-      if (!assignment || assignment.assignment_code !== data.assignment_code_input) {
-        throw new Error('Assignment code tidak valid');
-      }
-
-      // Check if student already submitted
-      const { data: existingSubmission } = await supabase.from('AssignmentSubmission').select('id').eq('assignment_id', data.assignment_id).eq('student_id', data.student_id).single();
-
-      if (existingSubmission) {
-        throw new Error('Anda sudah mengumpulkan assignment ini');
-      }
-
       const { data: submission, error } = await supabase
         .from('AssignmentSubmission')
         .insert({
-          ...data,
+          assignment_id: data.assignment_id,
+          student_id: data.student_id,
+          assignment_code_input: data.assignment_code_input,
+          file_url: data.file_url || null,
+          file_name: data.file_name || null,
+          submission_text: data.submission_text || null,
           status: 'submitted',
           submitted_at: new Date().toISOString(),
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(), // FIXED: Gunakan updatedAt, bukan updated_at
         })
         .select(
           `
           *,
-          assignment:Assignment(id, title, week_number),
-          student:User!AssignmentSubmission_student_id_fkey(id, name, nim, group, email)
+          assignment:Assignment(*),
+          student:User!AssignmentSubmission_student_id_fkey(id, name, email, nim, group)
         `,
         )
         .single();
@@ -238,74 +276,62 @@ export class AssignmentService {
   }
 
   /**
-   * Get student submissions
+   * Get student's submission for assignment
    */
-  static async getStudentSubmissions(studentId: string) {
-    try {
-      const { data: submissions, error } = await supabase
-        .from('AssignmentSubmission')
-        .select(
-          `
-          *,
-          assignment:Assignment(id, title, week_number, assignment_code, due_date),
-          student:User!AssignmentSubmission_student_id_fkey(id, name, nim, group, email)
-        `,
-        )
-        .eq('student_id', studentId)
-        .order('submitted_at', { ascending: false });
-
-      if (error) throw error;
-      return { data: submissions, error: null };
-    } catch (error: any) {
-      return { data: null, error: error.message };
-    }
-  }
-
-  // ==================== ADMIN SUBMISSION MANAGEMENT ====================
-
-  /**
-   * Get all submissions (Admin view)
-   */
-  static async getAllSubmissions() {
-    try {
-      const { data: submissions, error } = await supabase
-        .from('AssignmentSubmission')
-        .select(
-          `
-          *,
-          assignment:Assignment(id, title, week_number, assignment_code),
-          student:User!AssignmentSubmission_student_id_fkey(id, name, nim, group, email)
-        `,
-        )
-        .order('submitted_at', { ascending: false });
-
-      if (error) throw error;
-      return { data: submissions, error: null };
-    } catch (error: any) {
-      return { data: null, error: error.message };
-    }
-  }
-
-  /**
-   * Grade submission (Admin only) - FIXED updatedAt
-   */
-  static async gradeSubmission(submissionId: string, grade: number, feedback?: string) {
+  static async getStudentSubmission(assignmentId: string, studentId: string) {
     try {
       const { data: submission, error } = await supabase
         .from('AssignmentSubmission')
-        .update({
-          grade,
-          feedback,
-          status: 'graded',
-          graded_at: new Date().toISOString(),
-          updatedAt: new Date().toISOString(), // FIXED: Gunakan updatedAt, bukan updated_at
-        })
-        .eq('id', submissionId)
         .select(
           `
           *,
-          assignment:Assignment(id, title, week_number),
-          student:User!AssignmentSubmission_student_id_fkey(id, name, nim, group, email)
+          assignment:Assignment(*),
+          student:User!AssignmentSubmission_student_id_fkey(id, name, email, nim, group)
+        `,
+        )
+        .eq('assignment_id', assignmentId)
+        .eq('student_id', studentId)
+        .single();
+
+      if (error) throw error;
+      return { data: submission, error: null };
+    } catch (error: any) {
+      return { data: null, error: error.message };
+    }
+  }
+
+  /**
+   * Update submission (Student only)
+   */
+  static async updateSubmission(
+    id: string,
+    data: {
+      assignment_code_input?: string;
+      file_url?: string;
+      file_name?: string;
+      submission_text?: string;
+    },
+  ) {
+    try {
+      const updateData: any = {
+        status: 'submitted',
+        submitted_at: new Date().toISOString(),
+      };
+
+      if (data.assignment_code_input !== undefined) updateData.assignment_code_input = data.assignment_code_input;
+      if (data.file_url !== undefined) updateData.file_url = data.file_url;
+      if (data.file_name !== undefined) updateData.file_name = data.file_name;
+      if (data.submission_text !== undefined) updateData.submission_text = data.submission_text;
+
+      const { data: submission, error } = await supabase
+        .from('AssignmentSubmission')
+        .update(updateData)
+        .eq('id', id)
+        .select(
+          `
+          *,
+          assignment:Assignment(*),
+          student:User!AssignmentSubmission_student_id_fkey(id, name, email, nim, group)
         `,
         )
         .single();
@@ -317,18 +343,20 @@ export class AssignmentService {
     }
   }
 
+  // ==================== GRADING METHODS ====================
+
   /**
-   * Get submissions by assignment (Admin view)
+   * Get all submissions for assignment (Admin view)
    */
-  static async getSubmissionsByAssignment(assignmentId: string) {
+  static async getSubmissionsForAssignment(assignmentId: string) {
     try {
       const { data: submissions, error } = await supabase
         .from('AssignmentSubmission')
         .select(
           `
           *,
-          assignment:Assignment(id, title, week_number, assignment_code),
-          student:User!AssignmentSubmission_student_id_fkey(id, name, nim, group, email)
+          assignment:Assignment(*),
+          student:User!AssignmentSubmission_student_id_fkey(id, name, email, nim, group)
         `,
         )
         .eq('assignment_id', assignmentId)
@@ -342,20 +370,32 @@ export class AssignmentService {
   }
 
   /**
-   * Get submission by ID (for grading page)
+   * Grade submission (Admin only)
    */
-  static async getSubmissionById(submissionId: string) {
+  static async gradeSubmission(
+    submissionId: string,
+    data: {
+      grade: number;
+      feedback?: string;
+    },
+  ) {
     try {
       const { data: submission, error } = await supabase
         .from('AssignmentSubmission')
+        .update({
+          grade: data.grade,
+          feedback: data.feedback || null,
+          status: 'graded',
+          graded_at: new Date().toISOString(),
+        })
+        .eq('id', submissionId)
         .select(
           `
           *,
-          assignment:Assignment(id, title, week_number, assignment_code, description, due_date, file_url, file_name),
-          student:User!AssignmentSubmission_student_id_fkey(id, name, nim, group, email)
+          assignment:Assignment(*),
+          student:User!AssignmentSubmission_student_id_fkey(id, name, email, nim, group)
         `,
         )
-        .eq('id', submissionId)
         .single();
 
       if (error) throw error;
@@ -365,29 +405,71 @@ export class AssignmentService {
     }
   }
 
-  // ==================== STATISTICS ====================
+  /**
+   * Get all submissions (Admin view)
+   */
+  static async getAllSubmissions() {
+    try {
+      const { data: submissions, error } = await supabase
+        .from('AssignmentSubmission')
+        .select(
+          `
+          *,
+          assignment:Assignment(*),
+          student:User!AssignmentSubmission_student_id_fkey(id, name, email, nim, group)
+        `,
+        )
+        .order('submitted_at', { ascending: false });
+
+      if (error) throw error;
+      return { data: submissions, error: null };
+    } catch (error: any) {
+      return { data: null, error: error.message };
+    }
+  }
+
+  // ==================== STATS METHODS ====================
 
   /**
    * Get assignment statistics
    */
   static async getAssignmentStats() {
     try {
-      const [assignmentsResult, submissionsResult] = await Promise.all([supabase.from('Assignment').select('id', { count: 'exact' }), supabase.from('AssignmentSubmission').select('id, status', { count: 'exact' })]);
+      // Total assignments
+      const { count: totalAssignments } = await supabase.from('Assignment').select('*', { count: 'exact', head: true });
 
-      if (assignmentsResult.error) throw assignmentsResult.error;
-      if (submissionsResult.error) throw submissionsResult.error;
+      // Active assignments
+      const { count: activeAssignments } = await supabase.from('Assignment').select('*', { count: 'exact', head: true }).eq('is_active', true);
 
-      const totalAssignments = assignmentsResult.count || 0;
-      const allSubmissions = submissionsResult.data || [];
+      // Total submissions
+      const { count: totalSubmissions } = await supabase.from('AssignmentSubmission').select('*', { count: 'exact', head: true });
 
-      const stats = {
-        totalAssignments,
-        totalSubmissions: allSubmissions.length,
-        pendingSubmissions: allSubmissions.filter((s) => s.status === 'submitted').length,
-        gradedSubmissions: allSubmissions.filter((s) => s.status === 'graded').length,
+      // Pending submissions
+      const { count: pendingSubmissions } = await supabase.from('AssignmentSubmission').select('*', { count: 'exact', head: true }).eq('status', 'submitted');
+
+      // Graded submissions
+      const { count: gradedSubmissions } = await supabase.from('AssignmentSubmission').select('*', { count: 'exact', head: true }).eq('status', 'graded');
+
+      // Stats per kelas untuk eksperimen
+      const { data: classAAssignments } = await supabase.from('Assignment').select('id').contains('target_classes', ['A']);
+
+      const { data: classBAssignments } = await supabase.from('Assignment').select('id').contains('target_classes', ['B']);
+
+      const { data: bothClassesAssignments } = await supabase.from('Assignment').select('id').contains('target_classes', ['A']).contains('target_classes', ['B']);
+
+      return {
+        data: {
+          totalAssignments: totalAssignments || 0,
+          activeAssignments: activeAssignments || 0,
+          totalSubmissions: totalSubmissions || 0,
+          pendingSubmissions: pendingSubmissions || 0,
+          gradedSubmissions: gradedSubmissions || 0,
+          classAAssignments: classAAssignments?.length || 0,
+          classBAssignments: classBAssignments?.length || 0,
+          bothClassesAssignments: bothClassesAssignments?.length || 0,
+        },
+        error: null,
       };
-
-      return { data: stats, error: null };
     } catch (error: any) {
       return { data: null, error: error.message };
     }
