@@ -1,7 +1,7 @@
 // src/app/dashboard/assignments/grade/[submissionId]/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Container, Paper, Stack, Group, Title, Text, Badge, Button, Card, Divider, Textarea, NumberInput, Alert, LoadingOverlay, ActionIcon, Box, ScrollArea, Grid, Avatar, ThemeIcon } from '@mantine/core';
 import { useForm } from '@mantine/form';

@@ -2,13 +2,25 @@
 
 import { Card, Group, Text, Badge, Stack, SimpleGrid, Box, Tabs, Avatar, RingProgress, Center } from '@mantine/core';
 import { IconBulb, IconPencil, IconChartBar, IconClock } from '@tabler/icons-react';
-import { User } from '@/lib/supabase';
 import { LearningAnalytics } from '@/lib/analytics';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  group?: string;
+  nim?: string;
+  avatar_url?: string;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export interface UserAnalyticsCardProps {
   user: User;
   analytics: LearningAnalytics;
   compact?: boolean;
+  onClick?: () => void;
 }
 
 // Component untuk menampilkan analytics per user

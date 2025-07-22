@@ -39,8 +39,18 @@ export interface SubscriptionPlan {
   updatedAt: string;
 }
 
-// Import User type from existing file and extend it
-import type { User } from '@/lib/supabase';
+// ADDED: Missing User interface definition
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  nim?: string;
+  group?: string;
+  avatar_url?: string;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export interface UserWithBilling extends User {
   tier?: 'basic' | 'pro' | 'enterprise';

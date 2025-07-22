@@ -1,14 +1,24 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Stack, Title, Text, Group, Badge, SimpleGrid, Card, ThemeIcon, LoadingOverlay, Select, Button, Box, Avatar, Tabs, Progress, ActionIcon, Modal, ScrollArea, Table, Paper, Center, RingProgress } from '@mantine/core';
-import { IconUsers, IconBulb, IconPencil, IconTrendingUp, IconChartBar, IconEye, IconDownload, IconRefresh, IconArrowUp, IconArrowDown } from '@tabler/icons-react';
+import { Stack, Title, Text, Group, Badge, SimpleGrid, Card, ThemeIcon, LoadingOverlay, Select, Button, Avatar, Progress, ActionIcon, Modal, ScrollArea, Table, Paper, Center, RingProgress } from '@mantine/core';
+import { IconUsers, IconBulb, IconPencil, IconTrendingUp, IconEye, IconDownload, IconRefresh, IconArrowUp } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { AnalyticsService, LearningAnalytics } from '@/lib/analytics';
-import { User } from '@/lib/supabase';
+// REMOVED: import { User } from '@/lib/supabase'; - This was causing the error
 import { UserAnalyticsCard } from '@/components/analytics/user-analytics-card';
 import { usePageAnalytics } from '@/hooks/use-analytics';
+
+// FIXED: Define User interface first, before UserAnalytics
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  group?: string;
+  nim?: string;
+  avatar_url?: string;
+}
 
 interface UserAnalytics {
   user: User;
@@ -51,23 +61,24 @@ export default function AnalyticsDashboardPage() {
     setLoading(true);
     try {
       const analytics = await AnalyticsService.getAllUsersAnalyticsSummary();
-      // Ensure each user object has updateAt property (fallback to createdAt or null)
+      // Ensure each user object has proper properties
       setUsersAnalytics(
         analytics.map((item: any) => ({
           ...item,
           user: {
             ...item.user,
-            updateAt: item.user.updateAt ?? item.user.updatedAt ?? item.user.createdAt ?? null,
+            // FIXED: Handle different timestamp field names safely
+            updated_at: item.user.updated_at ?? item.user.updatedAt ?? item.user.created_at ?? null,
           },
         })),
       );
 
-      // Calculate summary
+      // Calculate summary with safe property access
       const totalUsers = analytics.length;
-      const avgProductivity = analytics.reduce((sum, item) => sum + item.analytics.overallStats.productivityScore, 0) / (totalUsers || 1);
-      const totalBrainProjects = analytics.reduce((sum, item) => sum + item.analytics.brainStats.totalProjects, 0);
-      const totalDrafts = analytics.reduce((sum, item) => sum + item.analytics.writerStats.totalDrafts, 0);
-      const highEngagementUsers = analytics.filter((item) => item.analytics.overallStats.engagementLevel === 'high').length;
+      const avgProductivity = analytics.reduce((sum, item) => sum + (item.analytics?.overallStats?.productivityScore || 0), 0) / (totalUsers || 1);
+      const totalBrainProjects = analytics.reduce((sum, item) => sum + (item.analytics?.brainStats?.totalProjects || 0), 0);
+      const totalDrafts = analytics.reduce((sum, item) => sum + (item.analytics?.writerStats?.totalDrafts || 0), 0);
+      const highEngagementUsers = analytics.filter((item) => item.analytics?.overallStats?.engagementLevel === 'high').length;
 
       setSummary({
         totalUsers,
@@ -91,9 +102,9 @@ export default function AnalyticsDashboardPage() {
         case 'name':
           return a.user.name.localeCompare(b.user.name);
         case 'productivity':
-          return b.analytics.overallStats.productivityScore - a.analytics.overallStats.productivityScore;
+          return (b.analytics?.overallStats?.productivityScore || 0) - (a.analytics?.overallStats?.productivityScore || 0);
         case 'activity':
-          return b.analytics.overallStats.totalLoginSessions - a.analytics.overallStats.totalLoginSessions;
+          return (b.analytics?.overallStats?.totalLoginSessions || 0) - (a.analytics?.overallStats?.totalLoginSessions || 0);
         default:
           return 0;
       }
@@ -153,7 +164,7 @@ export default function AnalyticsDashboardPage() {
                   High Engagement Rate
                 </Text>
                 <Text size="xl" fw={700}>
-                  {((summary.highEngagementUsers / summary.totalUsers) * 100).toFixed(1)}%
+                  {summary.totalUsers > 0 ? ((summary.highEngagementUsers / summary.totalUsers) * 100).toFixed(1) : '0.0'}%
                 </Text>
                 <Group gap="xs" mt="xs">
                   <IconTrendingUp size={14} />
@@ -194,7 +205,7 @@ export default function AnalyticsDashboardPage() {
                 {summary.totalBrainProjects}
               </Text>
               <Text size="xs" c="green" mt="xs">
-                Avg: {(summary.totalBrainProjects / summary.totalUsers).toFixed(1)} per student
+                Avg: {summary.totalUsers > 0 ? (summary.totalBrainProjects / summary.totalUsers).toFixed(1) : '0'} per student
               </Text>
             </div>
             <ThemeIcon color="violet" variant="light" size="xl" radius="md">
@@ -213,7 +224,7 @@ export default function AnalyticsDashboardPage() {
                 {summary.totalDrafts}
               </Text>
               <Text size="xs" c="green" mt="xs">
-                Avg: {(summary.totalDrafts / summary.totalUsers).toFixed(1)} per student
+                Avg: {summary.totalUsers > 0 ? (summary.totalDrafts / summary.totalUsers).toFixed(1) : '0'} per student
               </Text>
             </div>
             <ThemeIcon color="green" variant="light" size="xl" radius="md">
@@ -232,7 +243,7 @@ export default function AnalyticsDashboardPage() {
                 {summary.highEngagementUsers}
               </Text>
               <Text size="xs" c="blue" mt="xs">
-                {((summary.highEngagementUsers / summary.totalUsers) * 100).toFixed(1)}% of total
+                {summary.totalUsers > 0 ? ((summary.highEngagementUsers / summary.totalUsers) * 100).toFixed(1) : '0'}% of total
               </Text>
             </div>
             <ThemeIcon color="orange" variant="light" size="xl" radius="md">
@@ -251,7 +262,7 @@ export default function AnalyticsDashboardPage() {
                 {summary.activeThisWeek}
               </Text>
               <Text size="xs" c="blue" mt="xs">
-                {((summary.activeThisWeek / summary.totalUsers) * 100).toFixed(1)}% engagement
+                {summary.totalUsers > 0 ? ((summary.activeThisWeek / summary.totalUsers) * 100).toFixed(1) : '0'}% engagement
               </Text>
             </div>
             <ThemeIcon color="blue" variant="light" size="xl" radius="md">
@@ -330,31 +341,36 @@ export default function AnalyticsDashboardPage() {
                     </Table.Td>
                     <Table.Td>
                       <Text size="sm" fw={600}>
-                        {analytics.brainStats.totalProjects}
+                        {analytics?.brainStats?.totalProjects || 0}
                       </Text>
                       <Text size="xs" c="gray.6">
-                        {analytics.brainStats.totalNodes} nodes
+                        {analytics?.brainStats?.totalNodes || 0} nodes
                       </Text>
                     </Table.Td>
                     <Table.Td>
                       <Text size="sm" fw={600}>
-                        {analytics.writerStats.totalDrafts}
+                        {analytics?.writerStats?.totalDrafts || 0}
                       </Text>
                       <Text size="xs" c="gray.6">
-                        {analytics.writerStats.totalAnnotations} annotations
+                        {analytics?.writerStats?.totalAnnotations || 0} annotations
                       </Text>
                     </Table.Td>
                     <Table.Td>
                       <Group gap="xs">
-                        <Progress value={analytics.overallStats.productivityScore} size="sm" w={60} color={analytics.overallStats.productivityScore >= 80 ? 'green' : analytics.overallStats.productivityScore >= 60 ? 'yellow' : 'red'} />
+                        <Progress
+                          value={analytics?.overallStats?.productivityScore || 0}
+                          size="sm"
+                          w={60}
+                          color={(analytics?.overallStats?.productivityScore || 0) >= 80 ? 'green' : (analytics?.overallStats?.productivityScore || 0) >= 60 ? 'yellow' : 'red'}
+                        />
                         <Text size="sm" fw={500}>
-                          {analytics.overallStats.productivityScore}/100
+                          {analytics?.overallStats?.productivityScore || 0}/100
                         </Text>
                       </Group>
                     </Table.Td>
                     <Table.Td>
-                      <Badge color={analytics.overallStats.engagementLevel === 'high' ? 'green' : analytics.overallStats.engagementLevel === 'medium' ? 'yellow' : 'red'} variant="light">
-                        {analytics.overallStats.engagementLevel}
+                      <Badge color={analytics?.overallStats?.engagementLevel === 'high' ? 'green' : analytics?.overallStats?.engagementLevel === 'medium' ? 'yellow' : 'red'} variant="light">
+                        {analytics?.overallStats?.engagementLevel || 'low'}
                       </Badge>
                     </Table.Td>
                     <Table.Td>
