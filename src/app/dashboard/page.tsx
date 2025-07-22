@@ -428,7 +428,6 @@ export default function DashboardPage() {
         </Card>
       </SimpleGrid>
 
-      {/* BARU: Visual Analytics Section - Using Progress and RingProgress instead of charts */}
       <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="lg">
         {/* Role Distribution */}
         <Card withBorder shadow="sm" radius="md" p="lg">
