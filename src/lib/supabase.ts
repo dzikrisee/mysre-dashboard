@@ -105,7 +105,6 @@ export interface Database {
           sessionId: string | null;
         };
         Insert: {
-          id?: string;
           title: string;
           filePath: string;
           created_at?: string;
@@ -114,7 +113,6 @@ export interface Database {
           sessionId?: string | null;
         };
         Update: {
-          id?: string;
           title?: string;
           filePath?: string;
           created_at?: string;
@@ -137,7 +135,7 @@ export interface Database {
           is_active: boolean;
           target_classes: string[]; // Array field
           created_by: string;
-          "createdAt": string; // Quoted camelCase
+          createdAt: string; // Quoted camelCase
           updated_at: string; // Snake case
         };
         Insert: {
@@ -152,7 +150,7 @@ export interface Database {
           is_active?: boolean;
           target_classes: string[];
           created_by: string;
-          "createdAt"?: string; // Quoted camelCase
+          createdAt?: string; // Quoted camelCase
           updated_at?: string; // Snake case
         };
         Update: {
@@ -167,7 +165,7 @@ export interface Database {
           is_active?: boolean;
           target_classes?: string[];
           created_by?: string;
-          "createdAt"?: string; // Quoted camelCase
+          createdAt?: string; // Quoted camelCase
           updated_at?: string; // Snake case
         };
       };
@@ -333,11 +331,9 @@ export const uploadUserAvatar = async (userId: string, file: File) => {
     const filePath = `avatars/${fileName}`;
 
     // Upload file to storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(filePath, file, {
-        upsert: true,
-      });
+    const { data: uploadData, error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file, {
+      upsert: true,
+    });
 
     if (uploadError) throw uploadError;
 

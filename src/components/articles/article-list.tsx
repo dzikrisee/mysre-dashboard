@@ -6,9 +6,28 @@ import { IconDots, IconEdit, IconTrash, IconPlus, IconSearch, IconFilter, IconFi
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { useForm } from '@mantine/form';
-import { supabase, Article } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
-// import { ArticleForm } from './article-form'; // Will be created
+
+// Define Article interface locally since it's not exported from supabase
+interface Article {
+  id: string;
+  title: string;
+  filePath?: string;
+  sessionId?: string;
+  userId?: string;
+  createdAt: string;
+  updatedAt?: string;
+  author?: {
+    id: string;
+    name: string;
+    email: string;
+    role: 'ADMIN' | 'USER';
+    group?: string;
+    nim?: string;
+    avatar_url?: string; // Tambah ini
+  };
+}
 
 // Simple Article Form Component
 function SimpleArticleForm({ article, onClose, onSuccess }: { article?: any; onClose: () => void; onSuccess: () => void }) {
@@ -45,14 +64,12 @@ function SimpleArticleForm({ article, onClose, onSuccess }: { article?: any; onC
       console.log('📤 Uploading file to:', filePath);
       setUploadProgress(20);
 
-      // Try to upload directly first
       const { data, error: uploadError } = await supabase.storage.from('documents').upload(filePath, file, {
         cacheControl: '3600',
         upsert: false,
       });
 
       if (uploadError) {
-        // If bucket doesn't exist, show helpful error
         if (uploadError.message.includes('Bucket not found')) {
           throw new Error('Storage bucket belum dibuat. Silakan buat bucket "documents" di Supabase Dashboard > Storage');
         }
@@ -61,7 +78,6 @@ function SimpleArticleForm({ article, onClose, onSuccess }: { article?: any; onC
 
       setUploadProgress(70);
 
-      // Get public URL
       const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
 
       setUploadProgress(100);
@@ -94,18 +110,21 @@ function SimpleArticleForm({ article, onClose, onSuccess }: { article?: any; onC
         }
       }
 
-      const sessionId = `session-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-
       if (isEditing && article) {
         const updateData = {
           title: values.title,
           filePath: filePath,
-          updatedAt: new Date().toISOString(),
+          updateAt: new Date().toISOString(), // Sesuai dengan schema SQL (updateAt bukan updated_at)
         };
+
+        console.log('📝 Updating article:', article.id, 'with data:', updateData);
 
         const { error } = await supabase.from('Article').update(updateData).eq('id', article.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('🚨 Update error:', error);
+          throw new Error(`Update failed: ${error.message}`);
+        }
 
         notifications.show({
           title: 'Berhasil',
@@ -113,19 +132,28 @@ function SimpleArticleForm({ article, onClose, onSuccess }: { article?: any; onC
           color: 'green',
         });
       } else {
-        const articleId = `article-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        // Generate ID manual karena table tidak auto-increment
+        const timestamp = Date.now();
+        const randomStr = Math.random().toString(36).substring(2, 10);
+        const articleId = `art_${timestamp}_${randomStr}`;
 
         const insertData = {
-          id: articleId,
+          id: articleId, // HARUS ada ID manual
           title: values.title,
           filePath: filePath,
-          sessionId: sessionId,
           userId: user?.id || null,
         };
 
-        const { error } = await supabase.from('Article').insert(insertData);
+        console.log('📝 Inserting article data (with manual ID):', insertData);
 
-        if (error) throw error;
+        const { error, data } = await supabase.from('Article').insert(insertData).select();
+
+        if (error) {
+          console.error('🚨 Insert error:', error);
+          throw new Error(`Database error: ${error.message || 'Unknown error'}`);
+        }
+
+        console.log('✅ Article created successfully:', data);
 
         notifications.show({
           title: 'Berhasil',
@@ -209,7 +237,7 @@ function SimpleArticleForm({ article, onClose, onSuccess }: { article?: any; onC
             Penulis:
           </Text>
           <Text size="sm">
-            <strong>{user?.name}</strong> ({user?.role === 'admin' ? 'Administrator' : 'Mahasiswa'})
+            <strong>{user?.name}</strong> ({user?.role === 'ADMIN' ? 'Administrator' : 'Mahasiswa'})
           </Text>
         </Box>
 
@@ -231,12 +259,10 @@ interface ArticleListProps {
 }
 
 export function ArticleList({ onArticleSelect }: ArticleListProps) {
-  const [articles, setArticles] = useState<any[]>([]);
+  const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<string>('');
-  const [groupFilter, setGroupFilter] = useState<string>('');
   const [activePage, setActivePage] = useState(1);
   const [total, setTotal] = useState(0);
   const [showForm, setShowForm] = useState(false);
@@ -248,7 +274,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
 
   useEffect(() => {
     fetchArticles();
-  }, [activePage, searchQuery, roleFilter, groupFilter, activeTab]);
+  }, [activePage, searchQuery, activeTab]);
 
   const fetchArticles = async () => {
     setLoading(true);
@@ -257,30 +283,25 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
     try {
       console.log('🔍 Fetching articles...');
 
-      // Simple query tanpa JOIN kompleks dulu
       let query = supabase.from('Article').select('*', { count: 'exact' });
 
-      // Apply filters berdasarkan tab
       if (activeTab === 'my-articles' && user) {
         console.log('🔍 Applying my articles filter');
         query = query.eq('userId', user.id);
       }
 
-      // Search filter
       if (searchQuery && searchQuery.trim()) {
         console.log('🔍 Applying search filter:', searchQuery);
         query = query.ilike('title', `%${searchQuery}%`);
       }
 
-      // Order by created date
       query = query.order('createdAt', { ascending: false });
 
-      // Pagination
       const from = (activePage - 1) * pageSize;
       const to = from + pageSize - 1;
       query = query.range(from, to);
 
-      console.log('🔍 Executing simple query...');
+      console.log('🔍 Executing query...');
       const { data, error, count } = await query;
 
       if (error) {
@@ -288,21 +309,13 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
         throw error;
       }
 
-      // Fetch user data separately untuk setiap article
       const articlesWithAuthors = await Promise.all(
         (data || []).map(async (article) => {
           if (article.userId) {
-            const { data: userData } = await supabase.from('User').select('id, name, email, role, group, nim').eq('id', article.userId).single();
-
-            return {
-              ...article,
-              author: userData,
-            };
+            const { data: userData } = await supabase.from('User').select('id, name, email, role, group, nim, avatar_url').eq('id', article.userId).single();
+            return { ...article, author: userData };
           }
-          return {
-            ...article,
-            author: null,
-          };
+          return { ...article, author: null };
         }),
       );
 
@@ -339,9 +352,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
       onConfirm: async () => {
         try {
           const { error } = await supabase.from('Article').delete().eq('id', article.id);
-
           if (error) throw error;
-
           notifications.show({
             title: 'Berhasil',
             message: 'Artikel berhasil dihapus',
@@ -365,7 +376,6 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   };
 
   const handleView = (article: any) => {
-    // Check if file path exists and is valid
     if (!article.filePath) {
       notifications.show({
         title: 'File Tidak Tersedia',
@@ -375,24 +385,9 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
       return;
     }
 
-    // Check if it's a valid URL or path
     if (article.filePath.startsWith('http')) {
-      // It's a URL, try to open it
-      const newWindow = window.open(article.filePath, '_blank');
-
-      // Check if popup was blocked
-      setTimeout(() => {
-        if (newWindow && (newWindow.closed || !newWindow.location)) {
-          notifications.show({
-            title: 'Popup Diblokir',
-            message: 'Browser memblokir popup. Silakan allow popup atau copy link berikut: ' + article.filePath,
-            color: 'yellow',
-            autoClose: false,
-          });
-        }
-      }, 1000);
+      window.open(article.filePath, '_blank');
     } else {
-      // It's a relative path, show info
       notifications.show({
         title: 'File Path',
         message: `File location: ${article.filePath}`,
@@ -413,7 +408,6 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
 
     try {
       if (article.filePath.startsWith('http')) {
-        // Create download link
         const link = document.createElement('a');
         link.href = article.filePath;
         link.download = article.title + '.pdf';
@@ -426,12 +420,6 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
           title: 'Download',
           message: 'File sedang didownload...',
           color: 'green',
-        });
-      } else {
-        notifications.show({
-          title: 'Download',
-          message: `File path: ${article.filePath}`,
-          color: 'blue',
         });
       }
     } catch (error) {
@@ -455,7 +443,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
     <Stack gap="md">
       <Card withBorder shadow="sm" radius="md">
         <Group justify="space-between" mb="md">
-          <Title order={3}>List PDF / Artikel</Title>
+          <Title order={3}>Manajemen Artikel</Title>
           {isAdmin() && (
             <Button leftSection={<IconPlus size={16} />} onClick={() => setShowForm(true)}>
               Tambah Artikel
@@ -463,14 +451,12 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
           )}
         </Group>
 
-        {/* Error Alert */}
         {error && (
           <Alert icon={<IconAlertCircle size={16} />} title="Error" color="red" mb="md" onClose={() => setError(null)} withCloseButton>
             {error}
           </Alert>
         )}
 
-        {/* Simplified Tabs */}
         <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'all')} mb="md">
           <Tabs.List>
             <Tabs.Tab value="all" leftSection={<IconFileText size={16} />}>
@@ -482,12 +468,10 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
           </Tabs.List>
         </Tabs>
 
-        {/* Search only */}
         <Group mb="md">
           <TextInput placeholder="Cari judul artikel..." leftSection={<IconSearch size={16} />} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ flex: 1 }} />
         </Group>
 
-        {/* Simplified Table */}
         <Paper withBorder radius="md" style={{ position: 'relative' }}>
           <LoadingOverlay visible={loading} />
           <ScrollArea>
@@ -519,7 +503,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
                     </Table.Td>
                     <Table.Td>
                       <Group gap="sm">
-                        <Avatar size="sm" color="blue">
+                        <Avatar src={article.author?.avatar_url} size="sm" color="blue">
                           {article.author?.name?.charAt(0) || 'U'}
                         </Avatar>
                         <Box>
@@ -533,8 +517,8 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
                       </Group>
                     </Table.Td>
                     <Table.Td>
-                      <Badge color={article.author?.role === 'admin' ? 'red' : 'blue'} variant="light">
-                        {article.author?.role === 'admin' ? 'Administrator' : 'Mahasiswa'}
+                      <Badge color={article.author?.role === 'ADMIN' ? 'red' : 'blue'} variant="light">
+                        {article.author?.role === 'ADMIN' ? 'Administrator' : 'Mahasiswa'}
                       </Badge>
                     </Table.Td>
                     <Table.Td>
@@ -585,14 +569,12 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
           )}
         </Paper>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <Flex justify="center" mt="md">
             <Pagination value={activePage} onChange={setActivePage} total={totalPages} size="sm" />
           </Flex>
         )}
 
-        {/* Stats */}
         <Group justify="space-between" mt="md">
           <Text size="sm" c="gray.6">
             Menampilkan {articles.length} dari {total} artikel
@@ -600,7 +582,6 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
         </Group>
       </Card>
 
-      {/* Article Form Modal */}
       {showForm && (
         <Modal
           opened={showForm}

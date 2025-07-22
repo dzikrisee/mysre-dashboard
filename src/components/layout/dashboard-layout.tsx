@@ -94,16 +94,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     },
     {
       icon: <IconFileText size={20} />,
-      label: 'List Artikel',
+      label: 'Artikel',
       href: '/dashboard/articles',
     },
-    // TAMBAHKAN MENU ASSIGNMENT BARU
     {
       icon: <IconClipboardList size={20} />,
       label: 'Assignment',
       href: '/dashboard/assignments',
-      badge: 'NEW',
-      badgeColor: 'red',
     },
     {
       icon: <IconPencil size={20} />,
@@ -117,15 +114,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     },
     {
       icon: <IconReportAnalytics size={20} />,
-      label: 'Learning Analytics',
+      label: 'Analitik Pembelajaran',
       href: '/dashboard/analytics',
     },
     {
       icon: <IconReceipt size={20} />,
       label: 'Billing & Tokens',
       href: '/dashboard/billing',
-      badge: 'NEW',
-      badgeColor: 'green',
     },
   ];
 
@@ -239,7 +234,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </Text>
 
           {navLinks.map((link) => (
-            <NavLink key={link.href} icon={link.icon} label={link.label} href={link.href} active={pathname === link.href} onClick={() => handleNavClick(link.href)} badge={link.badge} badgeColor={link.badgeColor} />
+            <NavLink key={link.href} icon={link.icon} label={link.label} href={link.href} active={pathname === link.href} onClick={() => handleNavClick(link.href)} />
           ))}
 
           <Divider my="md" />
