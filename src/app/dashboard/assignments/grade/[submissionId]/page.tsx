@@ -3,45 +3,12 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import {
-  Container,
-  Paper,
-  Stack,
-  Group,
-  Title,
-  Text,
-  Badge,
-  Button,
-  Card,
-  Divider,
-  Textarea,
-  NumberInput,
-  Alert,
-  LoadingOverlay,
-  ActionIcon,
-  Box,
-  ScrollArea,
-  Grid,
-  Avatar,
-  ThemeIcon,
-} from '@mantine/core';
+import { Container, Paper, Stack, Group, Title, Text, Badge, Button, Card, Divider, Textarea, NumberInput, Alert, LoadingOverlay, ActionIcon, Box, ScrollArea, Grid, Avatar, ThemeIcon } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import {
-  IconArrowLeft,
-  IconDownload,
-  IconUser,
-  IconCalendar,
-  IconClock,
-  IconFile,
-  IconCheck,
-  IconAlertCircle,
-  IconNotes,
-  IconStar,
-  IconFileText,
-} from '@tabler/icons-react';
+import { IconArrowLeft, IconDownload, IconUser, IconCalendar, IconClock, IconFile, IconCheck, IconAlertCircle, IconNotes, IconStar, IconFileText } from '@tabler/icons-react';
 import { AssignmentService } from '@/lib/services/assignment.service';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/auth-provider';
 import type { AssignmentSubmission } from '@/lib/types/assignment';
 
 export default function GradingPage() {
@@ -75,7 +42,7 @@ export default function GradingPage() {
     try {
       setLoading(true);
       const result = await AssignmentService.getSubmissionById(submissionId);
-      
+
       if (result.error) {
         throw new Error(result.error);
       }
@@ -107,11 +74,7 @@ export default function GradingPage() {
 
     try {
       setGrading(true);
-      const result = await AssignmentService.gradeSubmission(
-        submission.id,
-        values.grade,
-        values.feedback
-      );
+      const result = await AssignmentService.gradeSubmission(submission.id, values.grade, values.feedback);
 
       if (result.error) {
         throw new Error(result.error);
@@ -215,11 +178,7 @@ export default function GradingPage() {
         {/* Header */}
         <Group justify="space-between">
           <Group>
-            <ActionIcon 
-              variant="light" 
-              size="lg"
-              onClick={() => router.back()}
-            >
+            <ActionIcon variant="light" size="lg" onClick={() => router.back()}>
               <IconArrowLeft size={20} />
             </ActionIcon>
             <div>
@@ -227,13 +186,8 @@ export default function GradingPage() {
               <Text c="gray.6">Detail submission dan form penilaian</Text>
             </div>
           </Group>
-          
-          <Badge 
-            leftSection={<IconClock size={12} />}
-            variant="light" 
-            color={getStatusColor(submission.status)}
-            size="lg"
-          >
+
+          <Badge leftSection={<IconClock size={12} />} variant="light" color={getStatusColor(submission.status)} size="lg">
             {getStatusLabel(submission.status)}
           </Badge>
         </Group>
@@ -250,15 +204,19 @@ export default function GradingPage() {
                     Minggu {submission.assignment?.week_number}
                   </Badge>
                 </Group>
-                
+
                 <Stack gap="sm">
                   <Group>
                     <ThemeIcon variant="light" color="blue" size="sm">
                       <IconFileText size={14} />
                     </ThemeIcon>
                     <div>
-                      <Text fw={500} size="sm">Judul Assignment</Text>
-                      <Text size="sm" c="gray.7">{submission.assignment?.title}</Text>
+                      <Text fw={500} size="sm">
+                        Judul Assignment
+                      </Text>
+                      <Text size="sm" c="gray.7">
+                        {submission.assignment?.title}
+                      </Text>
                     </div>
                   </Group>
 
@@ -267,7 +225,9 @@ export default function GradingPage() {
                       <IconNotes size={14} />
                     </ThemeIcon>
                     <div>
-                      <Text fw={500} size="sm">Assignment Code</Text>
+                      <Text fw={500} size="sm">
+                        Assignment Code
+                      </Text>
                       <Text size="sm" c="gray.7" tt="uppercase" fw={600}>
                         {submission.assignment?.assignment_code}
                       </Text>
@@ -280,7 +240,9 @@ export default function GradingPage() {
                         <IconCalendar size={14} />
                       </ThemeIcon>
                       <div>
-                        <Text fw={500} size="sm">Deadline</Text>
+                        <Text fw={500} size="sm">
+                          Deadline
+                        </Text>
                         <Text size="sm" c="gray.7">
                           {new Date(submission.assignment.due_date).toLocaleDateString('id-ID', {
                             weekday: 'long',
@@ -299,12 +261,14 @@ export default function GradingPage() {
                     <>
                       <Divider size="xs" />
                       <div>
-                        <Text fw={500} size="sm" mb="xs">Deskripsi Assignment</Text>
-                        <ScrollArea.Autosize maxHeight={120}>
+                        <Text fw={500} size="sm" mb="xs">
+                          Deskripsi Assignment
+                        </Text>
+                        <ScrollArea style={{ maxHeight: 300 }}>
                           <Text size="sm" c="gray.7" style={{ whiteSpace: 'pre-wrap' }}>
                             {submission.assignment.description}
                           </Text>
-                        </ScrollArea.Autosize>
+                        </ScrollArea>
                       </div>
                     </>
                   )}
@@ -317,18 +281,14 @@ export default function GradingPage() {
                           <IconFile size={14} />
                         </ThemeIcon>
                         <div style={{ flex: 1 }}>
-                          <Text fw={500} size="sm">File Assignment</Text>
+                          <Text fw={500} size="sm">
+                            File Assignment
+                          </Text>
                           <Group gap="xs">
-                            <Text size="sm" c="gray.7">{submission.assignment.file_name}</Text>
-                            <Button
-                              variant="subtle"
-                              size="xs"
-                              leftSection={<IconDownload size={12} />}
-                              onClick={() => downloadFile(
-                                submission.assignment!.file_url!,
-                                submission.assignment!.file_name || 'assignment-file'
-                              )}
-                            >
+                            <Text size="sm" c="gray.7">
+                              {submission.assignment.file_name}
+                            </Text>
+                            <Button variant="subtle" size="xs" leftSection={<IconDownload size={12} />} onClick={() => downloadFile(submission.assignment!.file_url!, submission.assignment!.file_name || 'assignment-file')}>
                               Download
                             </Button>
                           </Group>
@@ -341,36 +301,48 @@ export default function GradingPage() {
 
               {/* Student Info */}
               <Card withBorder shadow="sm" radius="md" p="lg">
-                <Title order={4} mb="md">Informasi Mahasiswa</Title>
-                
+                <Title order={4} mb="md">
+                  Informasi Mahasiswa
+                </Title>
+
                 <Group>
                   <Avatar size="lg" color="blue">
                     <IconUser size={24} />
                   </Avatar>
                   <div>
-                    <Text fw={600} size="lg">{submission.student?.name}</Text>
+                    <Text fw={600} size="lg">
+                      {submission.student?.name}
+                    </Text>
                     <Group gap="md">
-                      <Text size="sm" c="gray.6">NIM: {submission.student?.nim}</Text>
+                      <Text size="sm" c="gray.6">
+                        NIM: {submission.student?.nim}
+                      </Text>
                       <Badge variant="light" size="sm">
                         Kelas {submission.student?.group}
                       </Badge>
                     </Group>
-                    <Text size="sm" c="gray.6">{submission.student?.email}</Text>
+                    <Text size="sm" c="gray.6">
+                      {submission.student?.email}
+                    </Text>
                   </div>
                 </Group>
               </Card>
 
               {/* Submission Content */}
               <Card withBorder shadow="sm" radius="md" p="lg">
-                <Title order={4} mb="md">Jawaban Mahasiswa</Title>
-                
+                <Title order={4} mb="md">
+                  Jawaban Mahasiswa
+                </Title>
+
                 <Stack gap="md">
                   <Group>
                     <ThemeIcon variant="light" color="blue" size="sm">
                       <IconCalendar size={14} />
                     </ThemeIcon>
                     <div>
-                      <Text fw={500} size="sm">Waktu Pengumpulan</Text>
+                      <Text fw={500} size="sm">
+                        Waktu Pengumpulan
+                      </Text>
                       <Text size="sm" c="gray.7">
                         {new Date(submission.submitted_at).toLocaleDateString('id-ID', {
                           weekday: 'long',
@@ -389,7 +361,9 @@ export default function GradingPage() {
                       <IconNotes size={14} />
                     </ThemeIcon>
                     <div>
-                      <Text fw={500} size="sm">Code yang Diinput</Text>
+                      <Text fw={500} size="sm">
+                        Code yang Diinput
+                      </Text>
                       <Text size="sm" c="gray.7" tt="uppercase" fw={600}>
                         {submission.assignment_code_input}
                       </Text>
@@ -400,13 +374,15 @@ export default function GradingPage() {
                     <>
                       <Divider size="xs" />
                       <div>
-                        <Text fw={500} size="sm" mb="xs">Jawaban Teks</Text>
+                        <Text fw={500} size="sm" mb="xs">
+                          Jawaban Teks
+                        </Text>
                         <Paper withBorder p="md" bg="gray.0">
-                          <ScrollArea.Autosize maxHeight={300}>
+                          <ScrollArea style={{ maxHeight: 300 }}>
                             <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
                               {submission.submission_text}
                             </Text>
-                          </ScrollArea.Autosize>
+                          </ScrollArea>
                         </Paper>
                       </div>
                     </>
@@ -420,18 +396,14 @@ export default function GradingPage() {
                           <IconFile size={14} />
                         </ThemeIcon>
                         <div style={{ flex: 1 }}>
-                          <Text fw={500} size="sm">File Submission</Text>
+                          <Text fw={500} size="sm">
+                            File Submission
+                          </Text>
                           <Group gap="xs">
-                            <Text size="sm" c="gray.7">{submission.file_name}</Text>
-                            <Button
-                              variant="filled"
-                              size="sm"
-                              leftSection={<IconDownload size={16} />}
-                              onClick={() => downloadFile(
-                                submission.file_url!,
-                                submission.file_name || 'submission-file'
-                              )}
-                            >
+                            <Text size="sm" c="gray.7">
+                              {submission.file_name}
+                            </Text>
+                            <Button variant="filled" size="sm" leftSection={<IconDownload size={16} />} onClick={() => downloadFile(submission.file_url!, submission.file_name || 'submission-file')}>
                               Download File
                             </Button>
                           </Group>
@@ -459,7 +431,9 @@ export default function GradingPage() {
 
                 {submission.status === 'graded' && submission.graded_at && (
                   <Alert icon={<IconCheck size={16} />} color="green" variant="light">
-                    <Text size="sm" fw={500}>Sudah dinilai pada:</Text>
+                    <Text size="sm" fw={500}>
+                      Sudah dinilai pada:
+                    </Text>
                     <Text size="xs">
                       {new Date(submission.graded_at).toLocaleDateString('id-ID', {
                         weekday: 'long',
@@ -486,41 +460,19 @@ export default function GradingPage() {
                       description={
                         form.values.grade > 0 ? (
                           <Badge color={getGradeColor(form.values.grade)} size="sm" mt="xs">
-                            {form.values.grade >= 85 ? 'A' : 
-                             form.values.grade >= 70 ? 'B' : 
-                             form.values.grade >= 60 ? 'C' : 
-                             form.values.grade >= 50 ? 'D' : 'E'}
+                            {form.values.grade >= 85 ? 'A' : form.values.grade >= 70 ? 'B' : form.values.grade >= 60 ? 'C' : form.values.grade >= 50 ? 'D' : 'E'}
                           </Badge>
                         ) : null
                       }
                     />
 
-                    <Textarea
-                      label="Feedback (Opsional)"
-                      placeholder="Berikan feedback untuk mahasiswa..."
-                      minRows={4}
-                      maxRows={8}
-                      autosize
-                      leftSection={<IconNotes size={16} />}
-                      {...form.getInputProps('feedback')}
-                    />
+                    <Textarea label="Feedback (Opsional)" placeholder="Berikan feedback untuk mahasiswa..." minRows={4} maxRows={8} autosize leftSection={<IconNotes size={16} />} {...form.getInputProps('feedback')} />
 
-                    <Button
-                      type="submit"
-                      loading={grading}
-                      disabled={!form.isValid()}
-                      fullWidth
-                      leftSection={<IconCheck size={16} />}
-                    >
+                    <Button type="submit" loading={grading} disabled={!form.isValid()} fullWidth leftSection={<IconCheck size={16} />}>
                       {submission.status === 'graded' ? 'Update Penilaian' : 'Simpan Penilaian'}
                     </Button>
 
-                    <Button
-                      variant="light"
-                      onClick={() => router.back()}
-                      disabled={grading}
-                      fullWidth
-                    >
+                    <Button variant="light" onClick={() => router.back()} disabled={grading} fullWidth>
                       Kembali
                     </Button>
                   </Stack>

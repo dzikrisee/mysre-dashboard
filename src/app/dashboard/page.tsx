@@ -111,7 +111,7 @@ export default function DashboardPage() {
     setLoading(true);
     try {
       // Users data - FIXED: menggunakan field yang benar sesuai schema User table
-      const { data: users, error: usersError } = await supabase.from('User').select('id, name, email, role, "group", nim, avatar_url, "createdAt"');
+      const { data: users, error: usersError } = await supabase.from('User').select('id, name, email, role, "group", nim, avatar_url, "createdAt", "updated_at"');
 
       if (usersError) {
         console.error('Error fetching users:', usersError);
@@ -301,12 +301,14 @@ export default function DashboardPage() {
                 <Title order={2} c="blue.7">
                   Dasboard MySRE
                 </Title>
-                <Text c="gray.7" size="md">
-                  Selamat datang, <strong>{user?.name}</strong>!
-                  <Badge variant="light" color={user?.role === 'ADMIN' ? 'red' : 'blue'} size="sm" ml="xs" leftSection={user?.role === 'ADMIN'}>
+                <Group align="center" gap="xs">
+                  <Text c="gray.7" size="md">
+                    Selamat datang, <strong>{user?.name}</strong>!
+                  </Text>
+                  <Badge variant="light" color={user?.role === 'ADMIN' ? 'red' : 'blue'} size="sm">
                     {user?.role === 'ADMIN' ? 'Administrator' : 'Mahasiswa'}
                   </Badge>
-                </Text>
+                </Group>
               </div>
             </Group>
           </div>
