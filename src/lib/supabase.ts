@@ -252,6 +252,94 @@ export type AssignmentSubmissionRow = Database['public']['Tables']['AssignmentSu
 export type AssignmentSubmissionInsert = Database['public']['Tables']['AssignmentSubmission']['Insert'];
 export type AssignmentSubmissionUpdate = Database['public']['Tables']['AssignmentSubmission']['Update'];
 
+// ✅ ADDED: Missing interfaces that other files need to import
+export interface User {
+  id: string;
+  email: string;
+  password: string;
+  name: string;
+  role: 'ADMIN' | 'STUDENT';
+  nim?: string | null;
+  group?: string | null; // ✅ FIXED: Keep null to match database schema
+  phone?: string | null;
+  avatar_url?: string | null;
+  bio?: string | null;
+  university?: string | null;
+  faculty?: string | null;
+  major?: string | null;
+  semester?: number | null;
+  address?: string | null;
+  birthDate?: string | null;
+  linkedin?: string | null;
+  github?: string | null;
+  website?: string | null;
+  isEmailVerified?: boolean;
+  isPhoneVerified?: boolean;
+  lastActive?: string | null;
+  token_balance?: number;
+  settings?: any;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// ✅ ADDED: Draft interfaces needed by draft-editor.tsx
+export interface DraftSection {
+  id: string;
+  content: string;
+  order: number;
+  type: 'paragraph' | 'heading' | 'list' | 'quote';
+}
+
+export interface Draft {
+  id: string;
+  title: string;
+  content: string;
+  sections: DraftSection[];
+  userId: string;
+  status: 'draft' | 'published' | 'archived';
+  createdAt: string;
+  updatedAt: string;
+  metadata?: {
+    wordCount: number;
+    readingTime: number;
+    tags: string[];
+    category?: string;
+  };
+}
+
+// ✅ ADDED: Node interface needed by node-component.tsx
+export interface Node {
+  id: string;
+  articleId: string;
+  type: string;
+  content: string;
+  x?: number;
+  y?: number;
+  created_at?: string;
+  updated_at?: string;
+  userId?: string;
+}
+
+// ✅ ADDED: Article interface for consistent usage
+export interface Article {
+  id: string;
+  title: string;
+  filePath: string;
+  createdAt: string;
+  updateAt: string; // Note: database uses updateAt, not updated_at
+  userId: string | null;
+  sessionId: string | null;
+  author?: {
+    id: string;
+    name: string;
+    email: string;
+    role: 'ADMIN' | 'STUDENT';
+    group?: string;
+    nim?: string;
+    avatar_url?: string;
+  };
+}
+
 // User helper functions - FIXED timestamps
 export const getUserProfile = async (userId: string) => {
   return await supabase.from('User').select('*').eq('id', userId).single();

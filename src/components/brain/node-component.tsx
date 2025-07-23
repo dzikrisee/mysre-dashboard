@@ -3,10 +3,25 @@
 import { useState } from 'react';
 import { Card, Text, Group, ActionIcon, Badge, Menu } from '@mantine/core';
 import { IconDots, IconEdit, IconTrash, IconBrain } from '@tabler/icons-react';
-import { Node } from '@/lib/supabase';
+// REMOVED: import { Node } from '@/lib/supabase'; - This was causing the error
 import { useAuth } from '@/providers/auth-provider';
 import { AnalyticsTracker } from '@/lib/analytics-tracker';
 import { useFeatureAnalytics } from '@/hooks/use-analytics';
+
+// FIXED: Define Node interface locally
+interface Node {
+  id: string;
+  type: string;
+  content?: string;
+  articleId?: string;
+  position?: {
+    x: number;
+    y: number;
+  };
+  connections?: string[];
+  created_at?: string;
+  updated_at?: string;
+}
 
 interface NodeComponentProps {
   node: Node;
@@ -27,7 +42,7 @@ export function NodeComponent({ node, onEdit, onDelete, onClick }: NodeComponent
     // Track analytics - Brain Module
     if (user?.id) {
       try {
-        await AnalyticsTracker.trackNodeClick(user.id, node.id, node.type, node.articleId);
+        await AnalyticsTracker.trackNodeClick(user.id, node.id, node.type, node.articleId || '');
         trackFeature('node_interaction', {
           nodeType: node.type,
           nodeId: node.id,
@@ -64,6 +79,20 @@ export function NodeComponent({ node, onEdit, onDelete, onClick }: NodeComponent
     }
   };
 
+  const handleDelete = () => {
+    if (onDelete) {
+      onDelete(node.id);
+
+      // Track delete action
+      if (user?.id) {
+        trackFeature('node_delete_attempt', {
+          nodeType: node.type,
+          nodeId: node.id,
+        });
+      }
+    }
+  };
+
   return (
     <Card
       withBorder
@@ -97,34 +126,21 @@ export function NodeComponent({ node, onEdit, onDelete, onClick }: NodeComponent
             <Menu.Item leftSection={<IconEdit size={14} />} onClick={handleEdit}>
               Edit
             </Menu.Item>
-            <Menu.Item leftSection={<IconTrash size={14} />} color="red" onClick={() => onDelete?.(node.id)}>
+            <Menu.Item leftSection={<IconTrash size={14} />} color="red" onClick={handleDelete}>
               Delete
             </Menu.Item>
           </Menu.Dropdown>
         </Menu>
       </Group>
 
-      <Text fw={600} size="sm" mb="xs" lineClamp={2}>
-        {node.label}
+      <Text size="sm" lineClamp={3}>
+        {node.content || 'No content'}
       </Text>
 
-      {node.title && (
-        <Text size="xs" c="gray.6" mb="xs" lineClamp={1}>
-          {node.title}
+      {node.connections && node.connections.length > 0 && (
+        <Text size="xs" c="gray.6" mt="xs">
+          {node.connections.length} connection(s)
         </Text>
-      )}
-
-      {node.content && (
-        <Text size="xs" c="gray.7" lineClamp={3}>
-          {node.content}
-        </Text>
-      )}
-
-      {/* Analytics badge untuk development/debugging */}
-      {process.env.NODE_ENV === 'development' && (
-        <Badge size="xs" color="gray" variant="outline" mt="xs">
-          Tracked: Node Click
-        </Badge>
       )}
     </Card>
   );

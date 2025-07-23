@@ -2,16 +2,37 @@
 'use client';
 
 import { useState } from 'react';
-import { Modal, TextInput, Button, Stack, Group, FileInput, Box, Text, Textarea } from '@mantine/core';
+import { Modal, TextInput, Textarea, Button, Stack, Group, FileInput, Text, Progress } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconCheck, IconX, IconFileText, IconUpload } from '@tabler/icons-react';
-import { supabase, Article } from '@/lib/supabase';
+import { IconCheck, IconX, IconUpload } from '@tabler/icons-react';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
+
+export interface Article {
+  id: string;
+  title: string;
+  filePath: string;
+  createdAt: string;
+  updateAt: string; // FIXED: sesuai database schema
+  userId: string | null;
+  sessionId: string | null;
+  // Relations
+  author?: {
+    id: string;
+    name: string;
+    email: string;
+    role: 'ADMIN' | 'USER';
+    group?: string;
+    nim?: string;
+    avatar_url?: string;
+  };
+}
 
 interface ArticleFormProps {
   article?: Article | null;
   onClose: () => void;
+  onSuccess: () => void;
 }
 
 interface FormValues {
@@ -20,26 +41,23 @@ interface FormValues {
   file?: File | null;
 }
 
-export function ArticleForm({ article, onClose }: ArticleFormProps) {
+export function ArticleForm({ article, onClose, onSuccess }: ArticleFormProps) {
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const isEditing = !!article;
   const { user } = useAuth();
+  const isEditing = !!article;
 
-  const form = useForm<FormValues>({
+  const form = useForm({
     initialValues: {
       title: article?.title || '',
       description: '',
-      file: null,
+      file: null as File | null,
     },
     validate: {
       title: (value) => (value.length < 3 ? 'Judul minimal 3 karakter' : null),
       file: (value) => {
         if (!isEditing && !value) {
           return 'File PDF/Document harus diupload';
-        }
-        if (value && !['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(value.type)) {
-          return 'Hanya file PDF, DOC, atau DOCX yang diperbolehkan';
         }
         return null;
       },
@@ -48,7 +66,6 @@ export function ArticleForm({ article, onClose }: ArticleFormProps) {
 
   const uploadFileToStorage = async (file: File): Promise<string> => {
     try {
-      // Generate unique filename
       const timestamp = Date.now();
       const randomStr = Math.random().toString(36).substring(7);
       const fileExt = file.name.split('.').pop();
@@ -56,57 +73,29 @@ export function ArticleForm({ article, onClose }: ArticleFormProps) {
       const filePath = `articles/${fileName}`;
 
       console.log('📤 Uploading file to:', filePath);
-      setUploadProgress(10);
+      setUploadProgress(20);
 
-      // Check if storage bucket exists, if not create it
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const documentsExists = buckets?.some((bucket) => bucket.name === 'documents');
-
-      if (!documentsExists) {
-        // Create bucket if doesn't exist
-        const { error: bucketError } = await supabase.storage.createBucket('documents', {
-          public: true,
-          allowedMimeTypes: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
-          fileSizeLimit: 10485760, // 10MB
-        });
-
-        if (bucketError) {
-          console.log('Bucket might already exist:', bucketError);
-        }
-      }
-
-      setUploadProgress(30);
-
-      // Upload file
       const { data, error: uploadError } = await supabase.storage.from('documents').upload(filePath, file, {
         cacheControl: '3600',
         upsert: false,
       });
 
       if (uploadError) {
-        console.error('❌ Upload error:', uploadError);
-        throw new Error(`Upload failed: ${uploadError.message}`);
+        console.error('🚨 Upload error:', uploadError);
+        throw new Error(uploadError.message || 'Gagal upload file');
       }
 
-      setUploadProgress(70);
-
-      // Get public URL
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
-
       setUploadProgress(100);
-      console.log('✅ Upload successful:', urlData.publicUrl);
-
-      return urlData.publicUrl;
+      console.log('✅ File uploaded successfully:', data.path);
+      return data.path;
     } catch (error) {
-      console.error('💥 File upload failed:', error);
+      console.error('Upload failed:', error);
       throw error;
     }
   };
 
-  const handleSubmit = async (values: FormValues) => {
+  const handleSubmit = async (values: typeof form.values) => {
     setLoading(true);
-    setUploadProgress(0);
-
     try {
       let filePath = article?.filePath || '';
 
@@ -114,74 +103,80 @@ export function ArticleForm({ article, onClose }: ArticleFormProps) {
       if (values.file) {
         try {
           filePath = await uploadFileToStorage(values.file);
-        } catch (uploadError) {
+        } catch (error) {
           notifications.show({
-            title: 'Error Upload',
-            message: uploadError instanceof Error ? uploadError.message : 'Gagal upload file',
+            title: 'Error',
+            message: error instanceof Error ? error.message : 'Gagal upload file',
             color: 'red',
-            icon: <IconX size={16} />,
           });
           setLoading(false);
           return;
         }
       }
 
-      // Generate session ID automatically
-      const sessionId = `session-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-
       if (isEditing && article) {
-        // Update existing article
+        // FIXED: Update with correct field name
         const updateData = {
           title: values.title,
           filePath: filePath,
-          sessionId: article.sessionId || sessionId, // Keep existing or generate new
-          updatedAt: new Date().toISOString(),
+          updateAt: new Date().toISOString(), // FIXED: updateAt bukan updated_at
         };
+
+        console.log('📝 Updating article:', article.id, 'with data:', updateData);
 
         const { error } = await supabase.from('Article').update(updateData).eq('id', article.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('🚨 Update error:', error);
+          throw new Error(`Update failed: ${error.message}`);
+        }
 
         notifications.show({
           title: 'Berhasil',
           message: 'Artikel berhasil diperbarui',
           color: 'green',
-          icon: <IconCheck size={16} />,
         });
       } else {
-        // Create new article
-        const articleId = `article-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        // Generate ID manual karena table tidak auto-increment
+        const timestamp = Date.now();
+        const randomStr = Math.random().toString(36).substring(2, 10);
+        const articleId = `art_${timestamp}_${randomStr}`;
 
+        // FIXED: Insert with correct field names
         const insertData = {
-          id: articleId,
+          id: articleId, // Required manual ID
           title: values.title,
           filePath: filePath,
-          sessionId: sessionId,
           userId: user?.id || null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          sessionId: null, // Optional brainstorming session ID
+          // createdAt and updateAt will use database defaults
         };
 
-        const { error } = await supabase.from('Article').insert(insertData);
+        console.log('📝 Inserting article data:', insertData);
 
-        if (error) throw error;
+        const { error, data } = await supabase.from('Article').insert(insertData).select();
+
+        if (error) {
+          console.error('🚨 Insert error:', error);
+          throw new Error(`Database error: ${error.message || 'Unknown error'}`);
+        }
+
+        console.log('✅ Article created successfully:', data);
 
         notifications.show({
           title: 'Berhasil',
-          message: 'Artikel baru berhasil dibuat dan file telah diupload!',
+          message: 'Artikel baru berhasil dibuat!',
           color: 'green',
-          icon: <IconCheck size={16} />,
         });
       }
 
+      onSuccess();
       onClose();
     } catch (error) {
-      console.error('❌ Submit error:', error);
       notifications.show({
         title: 'Error',
-        message: error instanceof Error ? error.message : 'Terjadi kesalahan saat menyimpan artikel',
+        message: error instanceof Error ? error.message : 'Terjadi kesalahan',
         color: 'red',
-        icon: <IconX size={16} />,
       });
     } finally {
       setLoading(false);
@@ -203,87 +198,27 @@ export function ArticleForm({ article, onClose }: ArticleFormProps) {
     >
       <form onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
-          {/* Title */}
           <TextInput label="Judul Artikel" placeholder="Masukkan judul artikel" required {...form.getInputProps('title')} />
 
-          {/* Description (optional) */}
           <Textarea label="Deskripsi (Opsional)" placeholder="Deskripsi singkat tentang artikel" rows={3} {...form.getInputProps('description')} />
 
-          {/* File Upload */}
           <FileInput
-            label={isEditing ? 'Upload File Baru (Opsional)' : 'Upload File PDF/Document'}
-            placeholder="Pilih file PDF, DOC, atau DOCX"
+            label={isEditing ? 'File Baru (Opsional)' : 'File PDF/Document'}
+            placeholder="Pilih file PDF/Document"
             leftSection={<IconUpload size={16} />}
-            accept=".pdf,.doc,.docx"
+            accept=".pdf,.doc,.docx,.txt"
             required={!isEditing}
             {...form.getInputProps('file')}
           />
 
-          {/* Upload Progress */}
-          {loading && uploadProgress > 0 && (
-            <Box>
-              <Text size="sm" c="blue" mb="xs">
-                Uploading: {uploadProgress}%
-              </Text>
-              <div
-                style={{
-                  width: '100%',
-                  height: '8px',
-                  backgroundColor: '#e9ecef',
-                  borderRadius: '4px',
-                  overflow: 'hidden',
-                }}
-              >
-                <div
-                  style={{
-                    width: `${uploadProgress}%`,
-                    height: '100%',
-                    backgroundColor: '#228be6',
-                    transition: 'width 0.3s ease',
-                  }}
-                />
-              </div>
-            </Box>
-          )}
-
-          {/* Current File Info (for editing) */}
-          {isEditing && article?.filePath && (
-            <Box p="md" style={{ backgroundColor: 'var(--mantine-color-gray-0)', borderRadius: '8px' }}>
-              <Text size="sm" fw={500} mb="xs">
-                File Saat Ini:
-              </Text>
-              <Group gap="xs">
-                <IconFileText size={16} color="var(--mantine-color-red-6)" />
-                <Text size="sm" c="gray.7">
-                  {article.filePath.split('/').pop()}
-                </Text>
-              </Group>
-            </Box>
-          )}
-
-          {/* Author Info */}
-          <Box p="md" style={{ backgroundColor: 'var(--mantine-color-blue-0)', borderRadius: '8px' }}>
-            <Text size="sm" fw={500} mb="xs">
-              Informasi Penulis:
-            </Text>
-            <Group gap="sm">
-              <Text size="sm">
-                <strong>{user?.name}</strong> ({user?.role === 'admin' ? 'Administrator' : 'Mahasiswa'})
-              </Text>
-              {user?.group && (
-                <Text size="sm" c="gray.7">
-                  • Group {user.group}
-                </Text>
-              )}
-            </Group>
-          </Box>
+          {uploadProgress > 0 && uploadProgress < 100 && <Progress value={uploadProgress} size="sm" />}
 
           <Group justify="flex-end" mt="md">
-            <Button variant="subtle" onClick={onClose} disabled={loading}>
+            <Button variant="subtle" onClick={onClose}>
               Batal
             </Button>
             <Button type="submit" loading={loading}>
-              {loading ? (uploadProgress > 0 ? `Uploading ${uploadProgress}%` : 'Menyimpan...') : isEditing ? 'Simpan Perubahan' : 'Buat Artikel'}
+              {isEditing ? 'Simpan Perubahan' : 'Buat Artikel'}
             </Button>
           </Group>
         </Stack>

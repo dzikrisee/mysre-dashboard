@@ -1,5 +1,5 @@
 import { AnalyticsService, LearningAnalytics } from './analytics';
-import { User } from './supabase';
+import { User } from './supabase'; // ✅ Use the User from supabase instead of local definition
 
 export interface AnalyticsReport {
   generatedAt: string;

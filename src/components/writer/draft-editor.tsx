@@ -4,11 +4,35 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, TextInput, Textarea, Button, Group, Badge, Stack, ActionIcon, Text } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { IconDeviceFloppy, IconRobot, IconLocation, IconFileText } from '@tabler/icons-react';
-import { Draft, DraftSection } from '@/lib/supabase';
+
 import { useAuth } from '@/providers/auth-provider';
 import { AnalyticsTracker } from '@/lib/analytics-tracker';
 import { useFeatureAnalytics } from '@/hooks/use-analytics';
 import { notifications } from '@mantine/notifications';
+
+interface DraftSection {
+  id: string;
+  content: string;
+  order: number;
+  type: 'paragraph' | 'heading' | 'list' | 'quote';
+}
+
+interface Draft {
+  id: string;
+  title: string;
+  content: string;
+  sections: DraftSection[];
+  userId: string;
+  status: 'draft' | 'published' | 'archived';
+  createdAt: string;
+  updatedAt: string;
+  metadata?: {
+    wordCount: number;
+    readingTime: number;
+    tags: string[];
+    category?: string;
+  };
+}
 
 interface DraftEditorProps {
   draft?: Draft;

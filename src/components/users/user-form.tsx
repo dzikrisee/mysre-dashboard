@@ -1,23 +1,59 @@
 'use client';
-
 import { useState } from 'react';
 import { Modal, TextInput, Select, Button, Stack, Group, FileInput, Avatar, Box, Text, PasswordInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX, IconUpload } from '@tabler/icons-react';
-import { supabase, User } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
+
+// FIXED: Define User interface sesuai dengan database schema AKTUAL
+interface User {
+  id: string;
+  email: string;
+  name: string | null;
+  password: string;
+  role: 'ADMIN' | 'USER'; // FIXED: Database menggunakan 'USER', bukan 'STUDENT'
+  createdAt: string; // FIXED: camelCase di database
+  updated_at: string; // FIXED: snake_case di database
+  group?: string | null;
+  nim?: string | null;
+  tier?: string | null;
+  token_balance?: number | null;
+  monthly_token_limit?: number | null;
+  phone?: string | null;
+  bio?: string | null;
+  address?: string | null;
+  birth_date?: string | null; // FIXED: snake_case
+  university?: string | null;
+  faculty?: string | null;
+  major?: string | null;
+  semester?: number | null;
+  linkedin?: string | null;
+  github?: string | null;
+  website?: string | null;
+  is_email_verified?: boolean | null; // FIXED: snake_case
+  is_phone_verified?: boolean | null; // FIXED: snake_case
+  settings?: any;
+  last_active?: string | null; // FIXED: snake_case
+  birthDate?: string | null; // FIXED: Duplicate camelCase field
+  isEmailVerified?: boolean | null; // FIXED: Duplicate camelCase field
+  isPhoneVerified?: boolean | null; // FIXED: Duplicate camelCase field
+  lastActive?: string | null; // FIXED: Duplicate camelCase field
+  avatar_url?: string | null;
+}
 
 interface UserFormProps {
   user?: User | null;
   onClose: () => void;
 }
 
+// FIXED: FormValues sesuai database schema
 interface FormValues {
-  name: string; // Updated dari full_name ke name
+  name: string;
   email: string;
   password?: string;
-  role: 'admin' | 'user';
-  group?: 'A' | 'B' | '';
+  role: 'ADMIN' | 'USER'; // FIXED: Database default adalah 'USER'
+  group?: '' | 'A' | 'B';
   nim?: string;
   avatar?: File | null;
 }
@@ -28,11 +64,11 @@ export function UserForm({ user, onClose }: UserFormProps) {
 
   const form = useForm<FormValues>({
     initialValues: {
-      name: user?.name || '', // Updated dari full_name ke name
+      name: user?.name || '',
       email: user?.email || '',
       password: '',
-      role: user?.role || 'user',
-      group: user?.group || '',
+      role: user?.role || 'USER', // FIXED: Default 'USER' sesuai database
+      group: (user?.group as '' | 'A' | 'B') || '',
       nim: user?.nim || '',
       avatar: null,
     },
@@ -49,8 +85,8 @@ export function UserForm({ user, onClose }: UserFormProps) {
         return null;
       },
       nim: (value) => {
-        // Validasi NIM hanya untuk role user
-        if (form.values.role === 'user' && value) {
+        // Validasi NIM hanya untuk role USER (mahasiswa)
+        if (form.values.role === 'USER' && value) {
           if (!/^\d{10}$/.test(value)) {
             return 'NIM harus 10 digit angka';
           }
@@ -88,7 +124,6 @@ export function UserForm({ user, onClose }: UserFormProps) {
 
       // Get public URL
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
-
       return urlData.publicUrl;
     } catch (error) {
       console.error('Avatar upload failed:', error);
@@ -103,19 +138,18 @@ export function UserForm({ user, onClose }: UserFormProps) {
 
   const handleSubmit = async (values: FormValues) => {
     setLoading(true);
-
     try {
       if (isEditing && user) {
         // Update existing user
         const updateData: any = {
-          name: values.name, // Updated dari full_name ke name
+          name: values.name,
           email: values.email,
           role: values.role,
-          updatedAt: new Date().toISOString(), // Updated dari updated_at ke updatedAt
+          // updated_at akan otomatis di-update oleh trigger
         };
 
-        // Tambah group dan nim hanya jika role adalah user
-        if (values.role === 'user') {
+        // Tambah group dan nim hanya jika role adalah USER (mahasiswa)
+        if (values.role === 'USER') {
           updateData.group = values.group || null;
           updateData.nim = values.nim || null;
         } else {
@@ -131,17 +165,14 @@ export function UserForm({ user, onClose }: UserFormProps) {
           }
         }
 
-        const { error } = await supabase
-          .from('User') // Updated ke tabel User
-          .update(updateData)
-          .eq('id', user.id);
-
+        const { error } = await supabase.from('User').update(updateData).eq('id', user.id);
         if (error) throw error;
 
         // Update password if provided (via Supabase Auth)
         if (values.password) {
-          const { error: authError } = await supabase.auth.admin.updateUserById(user.id, { password: values.password });
-
+          const { error: authError } = await supabase.auth.admin.updateUserById(user.id, {
+            password: values.password,
+          });
           if (authError) {
             console.error('Password update error:', authError);
           }
@@ -160,7 +191,7 @@ export function UserForm({ user, onClose }: UserFormProps) {
           password: values.password!,
           options: {
             data: {
-              name: values.name, // Updated dari full_name ke name
+              name: values.name,
             },
           },
         });
@@ -171,7 +202,6 @@ export function UserForm({ user, onClose }: UserFormProps) {
 
         if (authData.user) {
           let avatarUrl = null;
-
           // Upload avatar if provided
           if (values.avatar) {
             try {
@@ -181,40 +211,57 @@ export function UserForm({ user, onClose }: UserFormProps) {
             }
           }
 
-          // Insert ke tabel User
+          // FIXED: Insert ke tabel User sesuai schema database AKTUAL
           const insertData: any = {
             id: authData.user.id,
             email: values.email,
-            name: values.name, // Updated dari full_name ke name
+            password: values.password!, // Required field
+            name: values.name,
             role: values.role,
             avatar_url: avatarUrl,
+            // Field berikut akan menggunakan DEFAULT values dari database:
+            // tier: 'basic' (default)
+            // token_balance: 100 (default)
+            // monthly_token_limit: 1000 (default)
+            // is_email_verified: false (default)
+            // is_phone_verified: false (default)
+            // isEmailVerified: false (default)
+            // isPhoneVerified: false (default)
+            // createdAt: CURRENT_TIMESTAMP (default)
+            // updated_at: CURRENT_TIMESTAMP (default)
+            // last_active: now() (default)
+            // lastActive: now() (default)
+            // settings: default JSON (default)
           };
 
-          // Tambah group dan nim hanya jika role adalah user
-          if (values.role === 'user') {
+          // Tambah group dan nim hanya jika role adalah USER (mahasiswa)
+          if (values.role === 'USER') {
             insertData.group = values.group || null;
             insertData.nim = values.nim || null;
           }
 
-          const { error: profileError } = await supabase
-            .from('User') // Updated ke tabel User
-            .insert(insertData);
+          console.log('🔍 Inserting user data:', insertData);
+
+          const { error: profileError, data: profileData } = await supabase.from('User').insert(insertData).select();
 
           if (profileError) {
+            console.error('🚨 Profile insert error:', profileError);
             throw new Error('Gagal membuat profil: ' + profileError.message);
           }
+
+          console.log('✅ User profile created:', profileData);
         }
 
         notifications.show({
           title: 'Berhasil',
-          message: `${values.role === 'admin' ? 'Administrator' : 'Mahasiswa'} baru berhasil dibuat`,
+          message: `${values.role === 'ADMIN' ? 'Administrator' : 'Mahasiswa'} baru berhasil dibuat`,
           color: 'green',
           icon: <IconCheck size={16} />,
         });
       }
-
       onClose();
     } catch (error) {
+      console.error('🚨 Error in handleSubmit:', error);
       notifications.show({
         title: 'Error',
         message: error instanceof Error ? error.message : 'Terjadi kesalahan',
@@ -222,7 +269,6 @@ export function UserForm({ user, onClose }: UserFormProps) {
         icon: <IconX size={16} />,
       });
     }
-
     setLoading(false);
   };
 
@@ -260,25 +306,25 @@ export function UserForm({ user, onClose }: UserFormProps) {
             placeholder="Pilih role"
             required
             data={[
-              { value: 'admin', label: 'Administrator' },
-              { value: 'user', label: 'Mahasiswa' },
+              { value: 'ADMIN', label: 'Administrator' },
+              { value: 'USER', label: 'Mahasiswa' }, // FIXED: Menggunakan 'USER' sesuai database
             ]}
             {...form.getInputProps('role')}
           />
 
           {/* Fields khusus untuk mahasiswa */}
-          {form.values.role === 'user' && (
+          {form.values.role === 'USER' && (
             <>
               <Select
                 label="Group"
                 placeholder="Pilih group"
                 data={[
+                  { value: '', label: 'Tidak ada group' },
                   { value: 'A', label: 'Group A' },
                   { value: 'B', label: 'Group B' },
                 ]}
                 {...form.getInputProps('group')}
               />
-
               <TextInput label="NIM" placeholder="Masukkan NIM (10 digit)" {...form.getInputProps('nim')} />
             </>
           )}
