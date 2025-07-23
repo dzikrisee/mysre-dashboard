@@ -1,16 +1,19 @@
+// src/components/auth/sign-in.tsx
+// FIXED: Dark mode compatibility
+
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Paper, TextInput, PasswordInput, Button, Title, Text, Container, Stack, Box, Alert, Group, ThemeIcon, Divider, Card, Badge } from '@mantine/core';
+import { Paper, TextInput, PasswordInput, Button, Title, Text, Container, Stack, Box, Alert, Group, Divider, Card, Badge } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { IconUser, IconLock, IconInfoCircle, IconShield, IconLogin, IconMail, IconId } from '@tabler/icons-react';
+import { IconLock, IconInfoCircle, IconLogin, IconMail, IconId } from '@tabler/icons-react';
 import { useAuth } from '@/providers/auth-provider';
 
 export function SignIn() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { signIn } = useAuth(); // This should work now
+  const { signIn } = useAuth();
   const router = useRouter();
 
   const form = useForm({
@@ -32,7 +35,6 @@ export function SignIn() {
       const result = await signIn(values.identifier, values.password);
 
       if (result.success) {
-        // Redirect to dashboard on successful login
         router.push('/dashboard');
       } else {
         setError(result.error || 'Terjadi kesalahan saat masuk');
@@ -44,7 +46,6 @@ export function SignIn() {
     }
   };
 
-  // Helper untuk mendeteksi apakah input adalah email atau NIM
   const isEmailFormat = (input: string) => input.includes('@');
 
   return (
@@ -55,7 +56,8 @@ export function SignIn() {
           order={1}
           size={36}
           fw={700}
-          c="blue.6"
+          // FIXED: Responsive color untuk dark mode
+          c="light-dark(var(--mantine-color-blue-6), var(--mantine-color-blue-4))"
           mb={8}
           style={{
             background: 'linear-gradient(45deg, #0096ff, #667eea)',
@@ -66,7 +68,13 @@ export function SignIn() {
         >
           MySRE
         </Title>
-        <Text size="lg" c="gray.7" fw={500} mb="sm">
+        <Text
+          size="lg"
+          // FIXED: Responsive color
+          c="light-dark(var(--mantine-color-gray-7), var(--mantine-color-gray-3))"
+          fw={500}
+          mb="sm"
+        >
           Dashboard Administrator
         </Text>
       </Box>
@@ -78,21 +86,29 @@ export function SignIn() {
         p={40}
         radius="lg"
         style={{
-          background: '#ffffff',
-          border: '1px solid #e9ecef',
+          // FIXED: Responsive background
+          background: 'light-dark(#ffffff, var(--mantine-color-dark-6))',
+          border: 'light-dark(1px solid #e9ecef, 1px solid var(--mantine-color-dark-4))',
         }}
       >
         <Stack gap="lg">
           <Box ta="center">
-            <Title order={2} size={24} fw={600} c="gray.8" mb="xs">
+            <Title
+              order={2}
+              size={24}
+              fw={600}
+              // FIXED: Responsive text color
+              c="light-dark(var(--mantine-color-gray-8), var(--mantine-color-gray-1))"
+              mb="xs"
+            >
               Masuk ke Dashboard
             </Title>
-            <Text size="sm" c="gray.6">
+            <Text size="sm" c="light-dark(var(--mantine-color-gray-6), var(--mantine-color-gray-4))">
               Akses khusus untuk administrator sistem
             </Text>
           </Box>
 
-          <Divider label="Masukkan kredensial Anda" labelPosition="center" color="gray.3" />
+          <Divider label="Masukkan kredensial Anda" labelPosition="center" color="light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-3))" />
 
           {error && (
             <Alert icon={<IconInfoCircle size={16} />} title="Login Gagal" color="red" variant="light">
@@ -111,13 +127,20 @@ export function SignIn() {
                 styles={{
                   label: {
                     fontWeight: 600,
-                    color: 'var(--mantine-color-gray-7)',
+                    // FIXED: Responsive label color
+                    color: 'light-dark(var(--mantine-color-gray-7), var(--mantine-color-gray-2))',
                   },
                   input: {
-                    border: '2px solid var(--mantine-color-gray-2)',
+                    // FIXED: Responsive input styling
+                    border: 'light-dark(2px solid var(--mantine-color-gray-2), 2px solid var(--mantine-color-dark-4))',
+                    background: 'light-dark(#ffffff, var(--mantine-color-dark-5))',
+                    color: 'light-dark(var(--mantine-color-gray-8), var(--mantine-color-gray-1))',
                     '&:focus': {
                       borderColor: 'var(--mantine-color-blue-5)',
                       boxShadow: '0 0 0 3px rgba(0, 150, 255, 0.1)',
+                    },
+                    '&::placeholder': {
+                      color: 'light-dark(var(--mantine-color-gray-5), var(--mantine-color-gray-6))',
                     },
                   },
                 }}
@@ -133,13 +156,18 @@ export function SignIn() {
                 styles={{
                   label: {
                     fontWeight: 600,
-                    color: 'var(--mantine-color-gray-7)',
+                    color: 'light-dark(var(--mantine-color-gray-7), var(--mantine-color-gray-2))',
                   },
                   input: {
-                    border: '2px solid var(--mantine-color-gray-2)',
+                    border: 'light-dark(2px solid var(--mantine-color-gray-2), 2px solid var(--mantine-color-dark-4))',
+                    background: 'light-dark(#ffffff, var(--mantine-color-dark-5))',
+                    color: 'light-dark(var(--mantine-color-gray-8), var(--mantine-color-gray-1))',
                     '&:focus': {
                       borderColor: 'var(--mantine-color-blue-5)',
                       boxShadow: '0 0 0 3px rgba(0, 150, 255, 0.1)',
+                    },
+                    '&::placeholder': {
+                      color: 'light-dark(var(--mantine-color-gray-5), var(--mantine-color-gray-6))',
                     },
                   },
                 }}
@@ -174,7 +202,7 @@ export function SignIn() {
             </Stack>
           </form>
 
-          <Divider color="gray.2" />
+          <Divider color="light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-3))" />
 
           {/* Login Info */}
           <Box>
@@ -186,7 +214,7 @@ export function SignIn() {
                 <Text size="sm">
                   • <strong>Mahasiswa:</strong> Gunakan NIM (hanya untuk testing)
                 </Text>
-                <Text size="sm" c="gray.6">
+                <Text size="sm" c="light-dark(var(--mantine-color-gray-6), var(--mantine-color-gray-4))">
                   Hanya administrator yang dapat mengakses dashboard ini.
                 </Text>
               </Stack>
@@ -194,7 +222,7 @@ export function SignIn() {
           </Box>
 
           <Box ta="center">
-            <Text size="xs" c="gray.4">
+            <Text size="xs" c="light-dark(var(--mantine-color-gray-4), var(--mantine-color-gray-5))">
               Hubungi IT Support jika mengalami kendala login.
             </Text>
           </Box>
@@ -204,7 +232,7 @@ export function SignIn() {
       {/* Footer Info */}
       <Box ta="center" mt="xl">
         <Group justify="center" gap="xs" mb="sm">
-          <Text size="xs" c="gray.4">
+          <Text size="xs" c="light-dark(var(--mantine-color-gray-4), var(--mantine-color-gray-5))">
             Powered by
           </Text>
           <Badge size="xs" variant="outline" color="gray">
@@ -217,7 +245,7 @@ export function SignIn() {
             Mantine
           </Badge>
         </Group>
-        <Text size="xs" c="gray.4">
+        <Text size="xs" c="light-dark(var(--mantine-color-gray-4), var(--mantine-color-gray-5))">
           © 2025 MySRE. Platform Manajemen Naskah Akademik.
         </Text>
       </Box>

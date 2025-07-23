@@ -730,7 +730,6 @@ export default function ProfilePage() {
             <Grid.Col span={{ base: 12, md: 8 }}>
               <Stack gap="md">
                 {/* Profile Completion */}
-                {/* Profile Completion */}
                 <Card withBorder shadow="sm" radius="md" p="lg">
                   <Group justify="space-between" mb="md">
                     <Text fw={600} size="md">
@@ -749,15 +748,15 @@ export default function ProfilePage() {
 
                   {/* Smart Actions untuk Profile Completion */}
                   {profileCompletion.percentage < 100 && (
-                    <Box mt="md" p="md" bg="orange.0" style={{ borderRadius: '8px', border: '1px solid var(--mantine-color-orange-2)' }}>
+                    <Box mt="md" p="md" className="profile-incomplete-box">
                       <Group gap="xs" mb="xs">
-                        <IconAlertCircle size={16} color="var(--mantine-color-orange-6)" />
-                        <Text size="sm" fw={500} c="orange.7">
+                        <IconAlertCircle size={16} className="warning-icon" />
+                        <Text size="sm" fw={500} className="warning-text">
                           Field yang belum lengkap:
                         </Text>
                       </Group>
 
-                      <Text size="sm" c="gray.7" mb="md">
+                      <Text size="sm" className="missing-fields-text" mb="md">
                         {profileCompletion.missing
                           .map((field: string) => {
                             const fieldLabels: Record<string, string> = {
@@ -838,14 +837,14 @@ export default function ProfilePage() {
 
                   {/* Success message untuk profile 100% */}
                   {profileCompletion.percentage === 100 && (
-                    <Box mt="md" p="md" bg="green.0" style={{ borderRadius: '8px', border: '1px solid var(--mantine-color-green-2)' }}>
+                    <Box mt="md" p="md" className="profile-complete-box">
                       <Group gap="xs">
-                        <IconCheck size={16} color="var(--mantine-color-green-6)" />
-                        <Text size="sm" fw={500} c="green.7">
+                        <IconCheck size={16} className="success-icon" />
+                        <Text size="sm" fw={500} className="success-text">
                           Profil Anda sudah lengkap!
                         </Text>
                       </Group>
-                      <Text size="sm" c="gray.7" mt="xs">
+                      <Text size="sm" className="success-description" mt="xs">
                         Terima kasih telah melengkapi profil. Ini membantu meningkatkan pengalaman Anda di MySRE.
                       </Text>
                     </Box>
@@ -1196,13 +1195,13 @@ export default function ProfilePage() {
                   }
                 />
 
-                <Divider />
+                {/* <Divider />
 
                 <Text fw={600} size="md">
                   Tampilan
-                </Text>
+                </Text> */}
 
-                <Switch
+                {/* <Switch
                   label="Dark Mode"
                   description="Menggunakan tema gelap"
                   checked={colorScheme === 'dark'}
@@ -1230,7 +1229,7 @@ export default function ProfilePage() {
                       }));
                     }
                   }}
-                />
+                /> */}
 
                 <Select
                   label="Bahasa"

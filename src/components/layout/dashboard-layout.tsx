@@ -1,11 +1,9 @@
-// src/components/layout/dashboard-layout.tsx - UPDATE EXISTING FILE
-// Tambahkan import IconClipboardList dan update navLinks
-
+// src/components/layout/dashboard-layout.tsx
 'use client';
 
 import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { AppShell, Group, Text, UnstyledButton, Burger, Image, Stack, Avatar, Menu, ActionIcon, Tooltip, Badge, Divider, Box } from '@mantine/core';
+import { AppShell, Group, Text, UnstyledButton, Burger, Image, Stack, Avatar, Menu, ActionIcon, Tooltip, Badge, Divider, Box, ScrollArea } from '@mantine/core';
 import {
   IconDashboard,
   IconUsers,
@@ -18,13 +16,15 @@ import {
   IconChevronRight,
   IconBell,
   IconLogout,
-  IconSettings,
   IconUser,
   IconCurrencyDollar,
-  IconClipboardList, // TAMBAHKAN INI
+  IconClipboardList,
+  IconSun,
+  IconMoon,
 } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { useAuth } from '@/providers/auth-provider';
+import { useTheme } from '@/providers/theme-provider';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -52,7 +52,7 @@ function NavLink({ icon, label, href, active, onClick, badge, badgeColor = 'blue
         borderRadius: '8px',
         textDecoration: 'none',
         backgroundColor: active ? 'var(--mantine-color-blue-0)' : 'transparent',
-        color: active ? 'var(--mantine-color-blue-7)' : 'var(--mantine-color-gray-7)',
+        // Hapus color override di sini, biarkan CSS global yang handle
         '&:hover': {
           backgroundColor: active ? 'var(--mantine-color-blue-0)' : 'var(--mantine-color-gray-0)',
         },
@@ -77,10 +77,10 @@ function NavLink({ icon, label, href, active, onClick, badge, badgeColor = 'blue
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [opened, { toggle, close }] = useDisclosure();
   const { user, signOut, isAdmin } = useAuth();
+  const { colorScheme, toggleColorScheme } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
 
-  // UPDATE: navLinks dengan assignment menu
   const navLinks = [
     {
       icon: <IconDashboard size={20} />,
@@ -170,17 +170,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </Tooltip>
             )}
 
-            {/* Revenue Indicator (untuk admin) */}
-            {isAdmin() && (
-              <Tooltip label="Monthly Revenue">
-                <ActionIcon variant="light" size="lg" color="green">
-                  <Group gap="xs">
-                    <IconCurrencyDollar size={16} />
-                    <span style={{ fontSize: '12px', fontWeight: 600 }}>$2.4K</span>
-                  </Group>
-                </ActionIcon>
-              </Tooltip>
-            )}
+            {/* Dark Mode Toggle Button */}
+            <Tooltip label={colorScheme === 'dark' ? 'Mode Terang' : 'Mode Gelap'}>
+              <ActionIcon variant="light" size="lg" onClick={toggleColorScheme} color={colorScheme === 'dark' ? 'yellow' : 'blue'}>
+                {colorScheme === 'dark' ? <IconSun size={20} /> : <IconMoon size={20} />}
+              </ActionIcon>
+            </Tooltip>
 
             <Tooltip label="Notifikasi">
               <ActionIcon variant="light" size="lg">
@@ -188,6 +183,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </ActionIcon>
             </Tooltip>
 
+            {/* Dropdown Profile dengan Profile dan Dark Mode Toggle */}
             <Menu shadow="md" width={200}>
               <Menu.Target>
                 <UnstyledButton>
@@ -212,9 +208,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <Menu.Item leftSection={<IconUser size={14} />} onClick={() => router.push('/dashboard/profile')}>
                   Profil Saya
                 </Menu.Item>
-                <Menu.Item leftSection={<IconSettings size={14} />} onClick={() => router.push('/dashboard/settings')}>
-                  Pengaturan
-                </Menu.Item>
 
                 <Menu.Divider />
 
@@ -228,33 +221,42 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       </AppShell.Header>
 
       <AppShell.Navbar p="md">
-        <Stack gap="xs">
-          <Text size="xs" fw={700} c="gray.6" tt="uppercase" mb="sm">
-            Menu Utama
-          </Text>
-
-          {navLinks.map((link) => (
-            <NavLink key={link.href} icon={link.icon} label={link.label} href={link.href} active={pathname === link.href} onClick={() => handleNavClick(link.href)} />
-          ))}
-
-          <Divider my="md" />
-
-          <Text size="xs" fw={700} c="gray.6" tt="uppercase" mb="sm">
-            System Info
-          </Text>
-
-          <Box p="sm" bg="gray.0" style={{ borderRadius: '8px' }}>
-            <Text size="xs" c="gray.6" mb="xs">
-              Status Server
+        {/* Tambahkan ScrollArea untuk mengatasi masalah scroll di sidebar */}
+        <ScrollArea style={{ height: 'calc(100vh - 140px)' }}>
+          <Stack gap="xs">
+            <Text size="xs" fw={700} c="gray.6" tt="uppercase" mb="sm">
+              Menu Utama
             </Text>
-            <Group gap="xs">
-              <Box w={8} h={8} bg="green" style={{ borderRadius: '50%' }} />
-              <Text size="xs" fw={500}>
-                Online
+
+            {navLinks.map((link) => (
+              <NavLink key={link.href} icon={link.icon} label={link.label} href={link.href} active={pathname === link.href} onClick={() => handleNavClick(link.href)} />
+            ))}
+
+            <Divider my="md" />
+
+            <Text size="xs" fw={700} c="gray.6" tt="uppercase" mb="sm">
+              System Info
+            </Text>
+
+            <Box
+              p="sm"
+              style={{
+                borderRadius: '8px',
+                backgroundColor: 'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-5))',
+              }}
+            >
+              <Text size="xs" c="gray.6" mb="xs">
+                Status Server
               </Text>
-            </Group>
-          </Box>
-        </Stack>
+              <Group gap="xs">
+                <Box w={8} h={8} bg="green" style={{ borderRadius: '50%' }} />
+                <Text size="xs" fw={500}>
+                  Online
+                </Text>
+              </Group>
+            </Box>
+          </Stack>
+        </ScrollArea>
       </AppShell.Navbar>
 
       <AppShell.Main>{children}</AppShell.Main>

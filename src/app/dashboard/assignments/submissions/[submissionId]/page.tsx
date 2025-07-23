@@ -1,26 +1,14 @@
 // src/app/dashboard/assignments/submissions/[submissionId]/page.tsx
+// FIXED: Infinite loop issue
+
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Container, Paper, Stack, Group, Title, Text, Badge, Button, Card, Textarea, NumberInput, Alert, LoadingOverlay, ActionIcon, Box, Grid, ThemeIcon, Anchor, Breadcrumbs } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import {
-  IconArrowLeft,
-  IconDownload,
-  IconUser,
-  IconClock,
-  IconFile,
-  IconCheck,
-  IconAlertCircle,
-  IconNotes,
-  IconStar,
-  IconFileText,
-  IconCode,
-  IconEdit,
-  IconDeviceFloppy, // FIXED: Changed from IconSave
-} from '@tabler/icons-react';
+import { IconArrowLeft, IconDownload, IconUser, IconClock, IconFile, IconCheck, IconAlertCircle, IconNotes, IconStar, IconFileText, IconCode, IconEdit, IconDeviceFloppy, IconCalendar } from '@tabler/icons-react';
 import { AssignmentService } from '@/lib/services/assignment.service';
 import { useAuth } from '@/providers/auth-provider';
 import type { AssignmentSubmission } from '@/lib/types/assignment';
@@ -49,7 +37,8 @@ export default function SubmissionDetailPage() {
     },
   });
 
-  const loadSubmissionData = useCallback(async () => {
+  // FIXED: Remove useCallback dan dependency yang menyebabkan infinite loop
+  const loadSubmissionData = async () => {
     try {
       setLoading(true);
       const result = await AssignmentService.getSubmissionById(submissionId);
@@ -69,6 +58,7 @@ export default function SubmissionDetailPage() {
         }
       }
     } catch (error: any) {
+      console.error('Error loading submission:', error);
       notifications.show({
         title: 'Error',
         message: 'Gagal memuat data submission',
@@ -78,13 +68,14 @@ export default function SubmissionDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [submissionId, form, router]);
+  };
 
+  // FIXED: Hanya dependency submissionId yang stabil
   useEffect(() => {
     if (submissionId) {
       loadSubmissionData();
     }
-  }, [submissionId, loadSubmissionData]);
+  }, [submissionId]);
 
   const handleGradeSubmit = async (values: typeof form.values) => {
     if (!submission) return;
@@ -104,6 +95,7 @@ export default function SubmissionDetailPage() {
       });
 
       setEditing(false);
+      // Reload data setelah berhasil
       await loadSubmissionData();
     } catch (error: any) {
       notifications.show({
@@ -129,13 +121,26 @@ export default function SubmissionDetailPage() {
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'Belum Dikumpulkan';
+      case 'submitted':
+        return 'Menunggu Penilaian';
+      case 'graded':
+        return 'Sudah Dinilai';
+      default:
+        return status;
+    }
+  };
+
   const getGradeColor = (grade: number) => {
     if (grade >= 80) return 'green';
     if (grade >= 60) return 'yellow';
     return 'red';
   };
 
-  // FIXED: Safe grade check
+  // Safe grade check
   const hasGrade = submission?.grade !== null && submission?.grade !== undefined;
   const gradeValue = submission?.grade || 0;
 
@@ -180,273 +185,262 @@ export default function SubmissionDetailPage() {
             </div>
             <Group>
               <Badge size="lg" color={getStatusColor(submission.status)} variant="light">
-                {submission.status === 'submitted' ? 'Menunggu Penilaian' : submission.status === 'graded' ? 'Sudah Dinilai' : 'Pending'}
+                {getStatusLabel(submission.status)}
               </Badge>
               {hasGrade && (
                 <Badge size="lg" color={getGradeColor(gradeValue)} variant="filled">
-                  Nilai: {gradeValue}
+                  {gradeValue}/100
                 </Badge>
               )}
             </Group>
           </Group>
 
+          {/* Student Info */}
           <Grid>
-            {/* Student Info */}
             <Grid.Col span={{ base: 12, md: 6 }}>
-              <Card withBorder radius="md" p="lg">
-                <Group mb="md">
-                  <ThemeIcon size="lg" variant="light" color="blue">
+              <Card withBorder radius="md" p="md">
+                <Group gap="sm">
+                  <ThemeIcon variant="light" color="blue" size="lg">
                     <IconUser size={20} />
                   </ThemeIcon>
-                  <Text fw={600}>Informasi Mahasiswa</Text>
+                  <div>
+                    <Text fw={600} size="lg">
+                      {submission.student?.name}
+                    </Text>
+                    <Group gap="xs">
+                      <Text size="sm" c="gray.6">
+                        NIM: {submission.student?.nim}
+                      </Text>
+                      <Badge size="xs" variant="light">
+                        Group {submission.student?.group}
+                      </Badge>
+                    </Group>
+                  </div>
                 </Group>
-                <Stack gap="sm">
-                  <Group>
-                    <Text fw={500} size="sm" w={80}>
-                      Nama:
-                    </Text>
-                    <Text size="sm">{submission.student?.name || 'N/A'}</Text>
-                  </Group>
-                  <Group>
-                    <Text fw={500} size="sm" w={80}>
-                      NIM:
-                    </Text>
-                    <Text size="sm" ff="monospace">
-                      {submission.student?.nim || 'N/A'}
-                    </Text>
-                  </Group>
-                  <Group>
-                    <Text fw={500} size="sm" w={80}>
-                      Email:
-                    </Text>
-                    <Text size="sm">{submission.student?.email || 'N/A'}</Text>
-                  </Group>
-                  <Group>
-                    <Text fw={500} size="sm" w={80}>
-                      Kelas:
-                    </Text>
-                    <Badge variant="light" size="sm">
-                      Kelas {submission.student?.group || 'N/A'}
-                    </Badge>
-                  </Group>
-                </Stack>
               </Card>
             </Grid.Col>
 
-            {/* Assignment Info */}
             <Grid.Col span={{ base: 12, md: 6 }}>
-              <Card withBorder radius="md" p="lg">
-                <Group mb="md">
-                  <ThemeIcon size="lg" variant="light" color="green">
-                    <IconFileText size={20} />
+              <Card withBorder radius="md" p="md">
+                <Group gap="sm">
+                  <ThemeIcon variant="light" color="green" size="lg">
+                    <IconClock size={20} />
                   </ThemeIcon>
-                  <Text fw={600}>Informasi Assignment</Text>
+                  <div>
+                    <Text fw={600} size="lg">
+                      Waktu Pengumpulan
+                    </Text>
+                    <Text size="sm" c="gray.6">
+                      {submission.submitted_at ? new Date(submission.submitted_at).toLocaleString('id-ID') : 'Belum dikumpulkan'}
+                    </Text>
+                  </div>
                 </Group>
-                <Stack gap="sm">
-                  <Group>
-                    <Text fw={500} size="sm" w={80}>
-                      Judul:
-                    </Text>
-                    <Text size="sm">{submission.assignment?.title || 'N/A'}</Text>
-                  </Group>
-                  <Group>
-                    <Text fw={500} size="sm" w={80}>
-                      Code:
-                    </Text>
-                    <Badge variant="light" color="cyan" size="sm">
-                      {submission.assignment?.assignment_code || 'N/A'}
-                    </Badge>
-                  </Group>
-                  <Group>
-                    <Text fw={500} size="sm" w={80}>
-                      Minggu:
-                    </Text>
-                    <Text size="sm">Minggu {submission.assignment?.week_number || 'N/A'}</Text>
-                  </Group>
-                  <Group>
-                    <Text fw={500} size="sm" w={80}>
-                      Dibuat:
-                    </Text>
-                    <Text size="sm">{submission.assignment?.creator?.name || 'N/A'}</Text>
-                  </Group>
-                </Stack>
               </Card>
             </Grid.Col>
           </Grid>
         </Paper>
 
-        {/* Submission Content */}
+        {/* Assignment Details */}
         <Paper withBorder shadow="sm" radius="md" p="xl">
-          <Title order={3} mb="lg">
-            Konten Submission
+          <Title order={3} mb="md">
+            Detail Assignment
           </Title>
 
           <Grid>
             <Grid.Col span={{ base: 12, md: 6 }}>
-              <Stack gap="md">
-                {/* Submission Info */}
-                <Card withBorder radius="md" p="md">
-                  <Group mb="md">
-                    <IconClock size={16} />
-                    <Text fw={600} size="sm">
-                      Waktu Submit
+              <Stack gap="sm">
+                <Group>
+                  <ThemeIcon variant="light" color="blue" size="sm">
+                    <IconFileText size={14} />
+                  </ThemeIcon>
+                  <div>
+                    <Text fw={500} size="sm">
+                      Judul
                     </Text>
-                  </Group>
-                  <Text size="sm">
-                    {new Date(submission.submitted_at).toLocaleDateString('id-ID', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </Text>
-                </Card>
+                    <Text size="sm" c="gray.7">
+                      {submission.assignment?.title}
+                    </Text>
+                  </div>
+                </Group>
 
-                {/* Assignment Code Input */}
-                <Card withBorder radius="md" p="md">
-                  <Group mb="md">
-                    <IconCode size={16} />
-                    <Text fw={600} size="sm">
-                      Code yang Diinput
+                <Group>
+                  <ThemeIcon variant="light" color="violet" size="sm">
+                    <IconCode size={14} />
+                  </ThemeIcon>
+                  <div>
+                    <Text fw={500} size="sm">
+                      Assignment Code
                     </Text>
-                  </Group>
-                  <Group>
-                    <Text ff="monospace" fw={600} c={submission.assignment_code_input === submission.assignment?.assignment_code ? 'green' : 'red'}>
-                      {submission.assignment_code_input}
+                    <Text size="sm" c="gray.7" tt="uppercase" fw={600}>
+                      {submission.assignment?.assignment_code}
                     </Text>
-                    {submission.assignment_code_input === submission.assignment?.assignment_code ? <IconCheck size={16} color="green" /> : <IconAlertCircle size={16} color="red" />}
-                  </Group>
-                  {submission.assignment_code_input !== submission.assignment?.assignment_code && (
-                    <Text size="xs" c="red" mt="xs">
-                      Code seharusnya: {submission.assignment?.assignment_code}
-                    </Text>
-                  )}
-                </Card>
-
-                {/* File Upload */}
-                {submission.file_url && (
-                  <Card withBorder radius="md" p="md">
-                    <Group mb="md">
-                      <IconFile size={16} />
-                      <Text fw={600} size="sm">
-                        File Submission
-                      </Text>
-                    </Group>
-                    <Group>
-                      <Text size="sm">{submission.file_name}</Text>
-                      <Button size="xs" leftSection={<IconDownload size={14} />} onClick={() => window.open(submission.file_url!, '_blank')}>
-                        Download
-                      </Button>
-                    </Group>
-                  </Card>
-                )}
-
-                {/* Text Submission */}
-                {submission.submission_text && (
-                  <Card withBorder radius="md" p="md">
-                    <Group mb="md">
-                      <IconNotes size={16} />
-                      <Text fw={600} size="sm">
-                        Teks Submission
-                      </Text>
-                    </Group>
-                    <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-                      {submission.submission_text}
-                    </Text>
-                  </Card>
-                )}
+                  </div>
+                </Group>
               </Stack>
             </Grid.Col>
 
-            {/* Grading Section - Admin Only */}
-            {user?.role === 'ADMIN' && (
-              <Grid.Col span={{ base: 12, md: 6 }}>
-                <Card withBorder radius="md" p="md">
-                  <Group justify="space-between" mb="md">
-                    <Group>
-                      <IconStar size={16} />
-                      <Text fw={600} size="sm">
-                        Penilaian
-                      </Text>
-                    </Group>
-                    {!editing && submission.status === 'submitted' && (
-                      <Button size="xs" leftSection={<IconEdit size={14} />} onClick={() => setEditing(true)}>
-                        Beri Nilai
-                      </Button>
-                    )}
-                  </Group>
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <Stack gap="sm">
+                <Group>
+                  <ThemeIcon variant="light" color="orange" size="sm">
+                    <IconCalendar size={14} />
+                  </ThemeIcon>
+                  <div>
+                    <Text fw={500} size="sm">
+                      Minggu
+                    </Text>
+                    <Text size="sm" c="gray.7">
+                      Minggu {submission.assignment?.week_number}
+                    </Text>
+                  </div>
+                </Group>
 
-                  {submission.status === 'graded' && !editing ? (
-                    // Display existing grade
-                    <Stack gap="md">
-                      <Group>
-                        <Text fw={500} size="sm">
-                          Nilai:
-                        </Text>
-                        <Badge size="lg" color={getGradeColor(gradeValue)} variant="filled">
-                          {gradeValue}/100
-                        </Badge>
-                      </Group>
-
-                      {submission.feedback && (
-                        <Box>
-                          <Text fw={500} size="sm" mb="xs">
-                            Feedback:
-                          </Text>
-                          <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-                            {submission.feedback}
-                          </Text>
-                        </Box>
-                      )}
-
-                      {submission.graded_at && (
-                        <Text size="xs" c="gray.6">
-                          Dinilai pada:{' '}
-                          {new Date(submission.graded_at).toLocaleDateString('id-ID', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </Text>
-                      )}
-
-                      <Button size="xs" variant="light" leftSection={<IconEdit size={14} />} onClick={() => setEditing(true)}>
-                        Edit Nilai
-                      </Button>
-                    </Stack>
-                  ) : editing ? (
-                    // Grading form
-                    <form onSubmit={form.onSubmit(handleGradeSubmit)}>
-                      <Stack gap="md">
-                        <NumberInput label="Nilai (0-100)" placeholder="Masukkan nilai" min={0} max={100} required {...form.getInputProps('grade')} />
-
-                        <Textarea label="Feedback" placeholder="Berikan feedback untuk mahasiswa..." minRows={3} {...form.getInputProps('feedback')} />
-
-                        <Group>
-                          <Button type="submit" loading={grading} leftSection={<IconDeviceFloppy size={16} />}>
-                            {grading ? 'Menyimpan...' : 'Simpan Nilai'}
-                          </Button>
-                          <Button variant="light" onClick={() => setEditing(false)} disabled={grading}>
-                            Batal
-                          </Button>
-                        </Group>
-                      </Stack>
-                    </form>
-                  ) : (
-                    // No grade yet
-                    <Alert icon={<IconAlertCircle size={16} />} color="blue" variant="light">
-                      <Text size="sm">Submission ini belum dinilai. Klik &quot;Beri Nilai&quot; untuk memberikan penilaian.</Text>
-                    </Alert>
-                  )}
-                </Card>
-              </Grid.Col>
-            )}
+                <Group>
+                  <ThemeIcon variant="light" color="red" size="sm">
+                    <IconClock size={14} />
+                  </ThemeIcon>
+                  <div>
+                    <Text fw={500} size="sm">
+                      Deadline
+                    </Text>
+                    <Text size="sm" c="gray.7">
+                      {submission.assignment?.due_date ? new Date(submission.assignment.due_date).toLocaleString('id-ID') : 'Tidak ada deadline'}
+                    </Text>
+                  </div>
+                </Group>
+              </Stack>
+            </Grid.Col>
           </Grid>
+
+          {submission.assignment?.description && (
+            <Box mt="md">
+              <Text fw={500} size="sm" mb="xs">
+                Deskripsi
+              </Text>
+              <Text size="sm" c="gray.7" style={{ whiteSpace: 'pre-wrap' }}>
+                {submission.assignment.description}
+              </Text>
+            </Box>
+          )}
         </Paper>
+
+        {/* Submission Content */}
+        <Paper withBorder shadow="sm" radius="md" p="xl">
+          <Title order={3} mb="md">
+            Konten Submission
+          </Title>
+
+          {submission.file_url && (
+            <Card withBorder radius="md" p="md" mb="md">
+              <Group justify="space-between">
+                <Group>
+                  <ThemeIcon variant="light" color="blue" size="lg">
+                    <IconFile size={20} />
+                  </ThemeIcon>
+                  <div>
+                    <Text fw={600}>File Attachment</Text>
+                    <Text size="sm" c="gray.6">
+                      {submission.file_name || 'file.pdf'}
+                    </Text>
+                  </div>
+                </Group>
+                <Button leftSection={<IconDownload size={16} />} variant="light" component="a" href={submission.file_url} target="_blank">
+                  Download
+                </Button>
+              </Group>
+            </Card>
+          )}
+
+          {submission.submission_text && (
+            <Card withBorder radius="md" p="md">
+              <Text fw={600} mb="sm">
+                Teks Submission
+              </Text>
+              <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                {submission.submission_text}
+              </Text>
+            </Card>
+          )}
+
+          {submission.assignment_code_input && (
+            <Card withBorder radius="md" p="md" mt="md">
+              <Text fw={600} mb="sm">
+                Assignment Code yang Dimasukkan
+              </Text>
+              <Text size="sm" tt="uppercase" fw={600} c="blue">
+                {submission.assignment_code_input}
+              </Text>
+            </Card>
+          )}
+        </Paper>
+
+        {/* Grading Section */}
+        {user?.role === 'ADMIN' && (
+          <Paper withBorder shadow="sm" radius="md" p="xl">
+            <Group justify="space-between" mb="md">
+              <Title order={3}>Penilaian</Title>
+              {!editing && (
+                <Button leftSection={<IconEdit size={16} />} variant="light" onClick={() => setEditing(true)}>
+                  {hasGrade ? 'Edit Nilai' : 'Beri Nilai'}
+                </Button>
+              )}
+            </Group>
+
+            {editing ? (
+              <form onSubmit={form.onSubmit(handleGradeSubmit)}>
+                <Stack gap="md">
+                  <NumberInput label="Nilai (0-100)" placeholder="Masukkan nilai" min={0} max={100} {...form.getInputProps('grade')} required />
+
+                  <Textarea label="Feedback" placeholder="Berikan feedback untuk mahasiswa (opsional)" rows={4} {...form.getInputProps('feedback')} />
+
+                  <Group>
+                    <Button type="submit" leftSection={<IconDeviceFloppy size={16} />} loading={grading}>
+                      Simpan Penilaian
+                    </Button>
+                    <Button variant="light" color="gray" onClick={() => setEditing(false)}>
+                      Batal
+                    </Button>
+                  </Group>
+                </Stack>
+              </form>
+            ) : (
+              <Stack gap="md">
+                {hasGrade ? (
+                  <>
+                    <Group>
+                      <ThemeIcon variant="light" color={getGradeColor(gradeValue)} size="lg">
+                        <IconStar size={20} />
+                      </ThemeIcon>
+                      <div>
+                        <Text fw={600} size="lg">
+                          Nilai: {gradeValue}/100
+                        </Text>
+                        <Badge color={getGradeColor(gradeValue)} variant="light">
+                          {gradeValue >= 80 ? 'Excellent' : gradeValue >= 60 ? 'Good' : 'Needs Improvement'}
+                        </Badge>
+                      </div>
+                    </Group>
+
+                    {submission.feedback && (
+                      <Card withBorder radius="md" p="md">
+                        <Text fw={600} mb="sm">
+                          Feedback
+                        </Text>
+                        <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                          {submission.feedback}
+                        </Text>
+                      </Card>
+                    )}
+                  </>
+                ) : (
+                  <Alert icon={<IconAlertCircle size={16} />} color="blue">
+                    Submission ini belum dinilai. Klik "Beri Nilai" untuk memberikan penilaian.
+                  </Alert>
+                )}
+              </Stack>
+            )}
+          </Paper>
+        )}
       </Stack>
     </Container>
   );

@@ -281,47 +281,53 @@ export default function DashboardPage() {
 
   return (
     <Stack gap="xl">
-      <Card
-        withBorder
-        shadow="md"
-        radius="lg"
-        p="xl"
-        style={{
-          background: 'linear-gradient(45deg, #f8f9ff 0%, #e6f3ff 100%)',
-          borderTop: '4px solid #228be6',
-        }}
-      >
+      <Paper withBorder shadow="sm" radius="lg" p="xl" className="dashboard-header-card">
         <Group justify="space-between" align="center">
-          <div>
-            <Group gap="sm" align="center" mb="xs">
-              <Avatar src={user?.avatar_url} size="lg" radius="xl" color="blue">
-                {user?.name?.charAt(0)}
-              </Avatar>
-              <div>
-                <Title order={2} c="blue.7">
-                  Dasboard MySRE
-                </Title>
-                <Group align="center" gap="xs">
-                  <Text c="gray.7" size="md">
-                    Selamat datang, <strong>{user?.name}</strong>!
+          <Group gap="md" align="center">
+            <Avatar src={user?.avatar_url} size="xl" radius="xl" color="blue" className="dashboard-avatar">
+              {user?.name?.charAt(0)}
+            </Avatar>
+            <div>
+              <Title order={1} size="h2" fw={600} className="dashboard-title">
+                Dashboard MySRE
+              </Title>
+              <Group gap="xs" mt="xs">
+                <Text size="lg" className="dashboard-welcome">
+                  Selamat datang,{' '}
+                  <Text span fw={600} className="dashboard-name">
+                    {user?.name}
                   </Text>
-                  <Badge variant="light" color={user?.role === 'ADMIN' ? 'red' : 'blue'} size="sm">
-                    {user?.role === 'ADMIN' ? 'Administrator' : 'Mahasiswa'}
-                  </Badge>
-                </Group>
-              </div>
-            </Group>
-          </div>
-          <Stack gap="xs" align="end">
-            <Badge variant="light" color="blue" size="md" leftSection={<IconCalendar size={14} />}>
-              {new Date().toLocaleDateString('id-ID')}
-            </Badge>
-            <Text size="xs" c="gray.6" className="text-bold">
-              Sistem berjalan normal
-            </Text>
-          </Stack>
+                  !
+                </Text>
+              </Group>
+              <Group gap="xs" mt="xs">
+                <Badge variant="light" color={user?.role === 'ADMIN' ? 'red' : 'blue'} size="md" radius="md">
+                  {user?.role === 'ADMIN' ? 'Administrator' : 'Mahasiswa'}
+                </Badge>
+                <Badge variant="outline" color="gray" size="md" radius="md">
+                  {new Date().toLocaleDateString('id-ID', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                </Badge>
+              </Group>
+            </div>
+          </Group>
+
+          <Group gap="sm" align="center">
+            <Paper withBorder radius="md" p="md" className="status-indicator">
+              <Group gap="xs">
+                <div className="status-dot"></div>
+                <Text size="sm" fw={500} className="status-text">
+                  Sistem Online
+                </Text>
+              </Group>
+            </Paper>
+          </Group>
         </Group>
-      </Card>
+      </Paper>
 
       {/* Stats Cards - DITAMBAHKAN: Total Assignment */}
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 5 }} spacing="lg">

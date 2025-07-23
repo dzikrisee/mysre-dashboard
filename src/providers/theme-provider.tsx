@@ -1,4 +1,4 @@
-// FILE: src/providers/theme-provider.tsx
+// src/providers/theme-provider.tsx
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
@@ -18,10 +18,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setMounted(true);
+
     // Load saved theme from localStorage
     const savedScheme = localStorage.getItem('color-scheme') as MantineColorScheme;
+
     if (savedScheme && (savedScheme === 'dark' || savedScheme === 'light')) {
       setMantineColorScheme(savedScheme);
+    } else {
+      // DEFAULT: Set ke light mode jika tidak ada preferensi yang tersimpan
+      setMantineColorScheme('light');
+      localStorage.setItem('color-scheme', 'light');
     }
   }, [setMantineColorScheme]);
 
