@@ -209,7 +209,7 @@ export default function ArticleDetailPage() {
   };
 
   const handleEdit = () => {
-    router.push(`/dashboard/articles/${articleId}/edit`);
+    router.push(`/dashboard/articles/${articleId}?edit=true`); // ✅ INI BENAR
   };
 
   const handleDelete = () => {

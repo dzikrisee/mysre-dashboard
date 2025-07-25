@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "node server.js", 
+    "start": "node server.js",
     "lint": "next lint"
   },
   "dependencies": {
@@ -27,11 +27,13 @@
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.50.3",
     "@tabler/icons-react": "^3.34.0",
+    "@types/uuid": "^10.0.0",
     "dayjs": "^1.11.13",
     "next": "15.3.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hot-toast": "^2.5.2",
+    "uuid": "^11.1.0",
     "zustand": "^5.0.6"
   },
   "devDependencies": {

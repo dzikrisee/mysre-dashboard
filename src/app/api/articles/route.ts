@@ -1,6 +1,7 @@
-// src/app/api/articles/route.ts - FIXED FOR PRISMA SCHEMA & UPLOADS BUCKET
+// src/app/api/articles/route.ts - FIXED VERSION dengan ID generation
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { v4 as uuidv4 } from 'uuid'; // Install: npm install uuid @types/uuid
 
 // GET - Fetch all articles
 export async function GET(request: NextRequest) {
@@ -86,8 +87,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Judul dan file path wajib diisi' }, { status: 400 });
     }
 
-    // ✅ UPDATED: Prepare article data sesuai Prisma schema
+    // ✅ FIXED: Generate UUID untuk ID - ini yang menyebabkan error null constraint
+    const articleId = uuidv4();
+    const now = new Date().toISOString();
+
+    // ✅ UPDATED: Prepare article data sesuai Prisma schema dengan ID eksplisit
     const articleData = {
+      id: articleId, // ✅ FIXED: Eksplisit set ID untuk menghindari null constraint
       title,
       filePath,
       userId: userId || null,
@@ -97,11 +103,13 @@ export async function POST(request: NextRequest) {
       doi: doi || null,
       keywords: keywords || null,
       year: year || null,
-      createdAt: new Date().toISOString(),
-      updateAt: new Date().toISOString(), // ✅ FIXED: updateAt sesuai Prisma
+      createdAt: now,
+      updateAt: now, // ✅ FIXED: updateAt sesuai Prisma
     };
 
-    const { data: newArticle, error } = await supabase.from('Article').insert(articleData).select('*').single();
+    console.log('Creating article with data:', articleData); // Debug log
+
+    const { data: newArticle, error } = await supabase.from('Article').insert(articleData).select('*');
 
     if (error) {
       console.error('Error creating article:', error);
@@ -132,7 +140,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Check if article exists
-    const { data: existingArticle, error: fetchError } = await supabase.from('Article').select('id').eq('id', id).single();
+    const { data: existingArticle, error: fetchError } = await supabase.from('Article').select('id').eq('id', id);
 
     if (fetchError || !existingArticle) {
       return NextResponse.json({ error: 'Artikel tidak ditemukan' }, { status: 404 });
@@ -144,7 +152,7 @@ export async function PUT(request: NextRequest) {
       updateAt: new Date().toISOString(), // ✅ FIXED: updateAt
     };
 
-    const { data: updatedArticle, error } = await supabase.from('Article').update(articleData).eq('id', id).select('*').single();
+    const { data: updatedArticle, error } = await supabase.from('Article').update(articleData).eq('id', id).select('*');
 
     if (error) {
       console.error('Error updating article:', error);
@@ -201,44 +209,6 @@ export async function DELETE(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error in articles DELETE:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
-
-// GET specific article by ID
-export async function GET_BY_ID(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const { id } = params;
-
-    const { data: article, error } = await supabase
-      .from('Article')
-      .select(
-        `
-        id,
-        title,
-        filePath,
-        createdAt,
-        updateAt,
-        userId,
-        sessionId,
-        abstract,
-        author,
-        doi,
-        keywords,
-        year,
-        user:userId(id, name, email, role, group, nim, avatar_url)
-      `,
-      )
-      .eq('id', id)
-      .single();
-
-    if (error || !article) {
-      return NextResponse.json({ error: 'Artikel tidak ditemukan' }, { status: 404 });
-    }
-
-    return NextResponse.json({ article });
-  } catch (error: any) {
-    console.error('Error fetching article:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
