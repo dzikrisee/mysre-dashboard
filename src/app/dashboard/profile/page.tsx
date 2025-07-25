@@ -444,12 +444,12 @@ export default function ProfilePage() {
 
       const avatarUrl = urlData.publicUrl;
 
-      // FIXED: Update user profile dengan kolom yang benar
+      // ✅ FIXED: Update user profile dengan kolom yang benar
       const { error: updateError } = await supabase
         .from('User')
         .update({
           avatar_url: avatarUrl,
-          updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
+          updateAt: new Date().toISOString(), // ✅ FIXED: Pakai updateAt bukan updated_at
         })
         .eq('id', user.id);
 

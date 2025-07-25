@@ -1,33 +1,13 @@
-// src/components/articles/article-form.tsx
+// src/components/articles/article-form.tsx - UPDATED FOR PRISMA SCHEMA
 'use client';
 
 import { useState } from 'react';
-import { Modal, TextInput, Textarea, Button, Stack, Group, FileInput, Text, Progress } from '@mantine/core';
+import { Modal, TextInput, Textarea, Button, Stack, Group, FileInput, Text, Progress, NumberInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX, IconUpload } from '@tabler/icons-react';
-import { supabase } from '@/lib/supabase';
+import { supabase, Article } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
-
-export interface Article {
-  id: string;
-  title: string;
-  filePath: string;
-  createdAt: string;
-  updateAt: string; // FIXED: sesuai database schema
-  userId: string | null;
-  sessionId: string | null;
-  // Relations
-  author?: {
-    id: string;
-    name: string;
-    email: string;
-    role: 'ADMIN' | 'USER';
-    group?: string;
-    nim?: string;
-    avatar_url?: string;
-  };
-}
 
 interface ArticleFormProps {
   article?: Article | null;
@@ -35,9 +15,14 @@ interface ArticleFormProps {
   onSuccess: () => void;
 }
 
+// ✅ UPDATED: FormValues sesuai Prisma schema dengan field tambahan
 interface FormValues {
   title: string;
-  description?: string;
+  abstract?: string;
+  author?: string;
+  doi?: string;
+  keywords?: string;
+  year?: string;
   file?: File | null;
 }
 
@@ -50,14 +35,29 @@ export function ArticleForm({ article, onClose, onSuccess }: ArticleFormProps) {
   const form = useForm({
     initialValues: {
       title: article?.title || '',
-      description: '',
+      abstract: article?.abstract || '',
+      author: article?.author || '',
+      doi: article?.doi || '',
+      keywords: article?.keywords || '',
+      year: article?.year || '',
       file: null as File | null,
     },
     validate: {
       title: (value) => (value.length < 3 ? 'Judul minimal 3 karakter' : null),
+      author: (value) => (value && value.length < 2 ? 'Nama penulis minimal 2 karakter' : null),
+      year: (value) => {
+        if (value && (!/^\d{4}$/.test(value) || parseInt(value) < 1900 || parseInt(value) > new Date().getFullYear() + 10)) {
+          return 'Tahun harus berupa 4 digit angka yang valid';
+        }
+        return null;
+      },
       file: (value) => {
         if (!isEditing && !value) {
           return 'File PDF/Document harus diupload';
+        }
+        if (value && value.size > 10 * 1024 * 1024) {
+          // 10MB limit
+          return 'Ukuran file maksimal 10MB';
         }
         return null;
       },
@@ -72,111 +72,103 @@ export function ArticleForm({ article, onClose, onSuccess }: ArticleFormProps) {
       const fileName = `${timestamp}-${randomStr}.${fileExt}`;
       const filePath = `articles/${fileName}`;
 
-      console.log('📤 Uploading file to:', filePath);
-      setUploadProgress(20);
+      // Simulate upload progress
+      setUploadProgress(25);
 
-      const { data, error: uploadError } = await supabase.storage.from('documents').upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
+      const { error: uploadError } = await supabase.storage.from('documents').upload(filePath, file);
 
       if (uploadError) {
-        console.error('🚨 Upload error:', uploadError);
-        throw new Error(uploadError.message || 'Gagal upload file');
+        throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
       setUploadProgress(100);
-      console.log('✅ File uploaded successfully:', data.path);
-      return data.path;
+
+      // Small delay to show progress
+      setTimeout(() => setUploadProgress(0), 1000);
+
+      return filePath;
     } catch (error) {
-      console.error('Upload failed:', error);
+      console.error('Error uploading file:', error);
+      setUploadProgress(0);
       throw error;
     }
   };
 
-  const handleSubmit = async (values: typeof form.values) => {
+  const handleSubmit = async (values: FormValues) => {
     setLoading(true);
+    setUploadProgress(0);
+
     try {
-      let filePath = article?.filePath || '';
+      let filePath = article?.filePath;
 
-      // Upload file if provided
+      // Upload file jika ada file baru
       if (values.file) {
-        try {
-          filePath = await uploadFileToStorage(values.file);
-        } catch (error) {
-          notifications.show({
-            title: 'Error',
-            message: error instanceof Error ? error.message : 'Gagal upload file',
-            color: 'red',
-          });
-          setLoading(false);
-          return;
-        }
+        filePath = await uploadFileToStorage(values.file);
       }
 
-      if (isEditing && article) {
-        // FIXED: Update with correct field name
-        const updateData = {
-          title: values.title,
-          filePath: filePath,
-          updateAt: new Date().toISOString(), // FIXED: updateAt bukan updated_at
-        };
+      // ✅ UPDATED: Prepare data sesuai Prisma schema
+      const articleData: any = {
+        title: values.title,
+        filePath: filePath!,
+        abstract: values.abstract || null,
+        author: values.author || null,
+        doi: values.doi || null,
+        keywords: values.keywords || null,
+        year: values.year || null,
+        updateAt: new Date().toISOString(), // ✅ FIXED: updateAt sesuai Prisma
+        userId: user?.id || null,
+      };
 
-        console.log('📝 Updating article:', article.id, 'with data:', updateData);
-
-        const { error } = await supabase.from('Article').update(updateData).eq('id', article.id);
-
-        if (error) {
-          console.error('🚨 Update error:', error);
-          throw new Error(`Update failed: ${error.message}`);
-        }
-
-        notifications.show({
-          title: 'Berhasil',
-          message: 'Artikel berhasil diperbarui',
-          color: 'green',
-        });
+      let result;
+      if (isEditing) {
+        // Update existing article
+        result = await supabase
+          .from('Article')
+          .update(articleData)
+          .eq('id', article!.id)
+          .select(
+            `
+            *,
+            user:User(id, name, email, role, group, nim, avatar_url)
+          `,
+          )
+          .single();
       } else {
-        // Generate ID manual karena table tidak auto-increment
-        const timestamp = Date.now();
-        const randomStr = Math.random().toString(36).substring(2, 10);
-        const articleId = `art_${timestamp}_${randomStr}`;
+        // Create new article
+        articleData.createdAt = new Date().toISOString(); // ✅ FIXED: createdAt
 
-        // FIXED: Insert with correct field names
-        const insertData = {
-          id: articleId, // Required manual ID
-          title: values.title,
-          filePath: filePath,
-          userId: user?.id || null,
-          sessionId: null, // Optional brainstorming session ID
-          // createdAt and updateAt will use database defaults
-        };
-
-        console.log('📝 Inserting article data:', insertData);
-
-        const { error, data } = await supabase.from('Article').insert(insertData).select();
-
-        if (error) {
-          console.error('🚨 Insert error:', error);
-          throw new Error(`Database error: ${error.message || 'Unknown error'}`);
-        }
-
-        console.log('✅ Article created successfully:', data);
-
-        notifications.show({
-          title: 'Berhasil',
-          message: 'Artikel baru berhasil dibuat!',
-          color: 'green',
-        });
+        result = await supabase
+          .from('Article')
+          .insert(articleData)
+          .select(
+            `
+            *,
+            user:User(id, name, email, role, group, nim, avatar_url)
+          `,
+          )
+          .single();
       }
+
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+
+      notifications.show({
+        title: 'Berhasil!',
+        message: `Artikel berhasil ${isEditing ? 'diperbarui' : 'ditambahkan'}`,
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
 
       onSuccess();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error saving article:', error);
       notifications.show({
-        title: 'Error',
-        message: error instanceof Error ? error.message : 'Terjadi kesalahan',
+        title: 'Error!',
+        message: error.message || 'Terjadi kesalahan saat menyimpan artikel',
         color: 'red',
+        icon: <IconX size={16} />,
       });
     } finally {
       setLoading(false);
@@ -185,40 +177,50 @@ export function ArticleForm({ article, onClose, onSuccess }: ArticleFormProps) {
   };
 
   return (
-    <Modal
-      opened
-      onClose={onClose}
-      title={
-        <Text size="lg" fw={600}>
-          {isEditing ? 'Edit Artikel' : 'Tambah Artikel Baru'}
-        </Text>
-      }
-      size="md"
-      closeOnClickOutside={false}
-    >
+    <Modal opened={true} onClose={onClose} title={`${isEditing ? 'Edit' : 'Tambah'} Artikel`} size="lg" centered>
       <form onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
+          {/* Basic Info */}
           <TextInput label="Judul Artikel" placeholder="Masukkan judul artikel" required {...form.getInputProps('title')} />
 
-          <Textarea label="Deskripsi (Opsional)" placeholder="Deskripsi singkat tentang artikel" rows={3} {...form.getInputProps('description')} />
+          <Textarea label="Abstrak" placeholder="Ringkasan atau abstrak artikel (opsional)" minRows={3} maxRows={6} {...form.getInputProps('abstract')} />
 
-          <FileInput
-            label={isEditing ? 'File Baru (Opsional)' : 'File PDF/Document'}
-            placeholder="Pilih file PDF/Document"
-            leftSection={<IconUpload size={16} />}
-            accept=".pdf,.doc,.docx,.txt"
-            required={!isEditing}
-            {...form.getInputProps('file')}
-          />
+          {/* Author Info */}
+          <Group grow>
+            <TextInput label="Penulis" placeholder="Nama penulis artikel" {...form.getInputProps('author')} />
+            <TextInput label="Tahun Publikasi" placeholder="2024" {...form.getInputProps('year')} />
+          </Group>
 
-          {uploadProgress > 0 && uploadProgress < 100 && <Progress value={uploadProgress} size="sm" />}
+          {/* Academic Info */}
+          <Group grow>
+            <TextInput label="DOI" placeholder="10.1000/182 (opsional)" {...form.getInputProps('doi')} />
+            <TextInput label="Kata Kunci" placeholder="machine learning, AI, data science" {...form.getInputProps('keywords')} />
+          </Group>
 
-          <Group justify="flex-end" mt="md">
-            <Button variant="subtle" onClick={onClose}>
+          {/* File Upload */}
+          <FileInput label="File Dokumen" placeholder="Pilih file PDF, DOC, atau DOCX" accept=".pdf,.doc,.docx,.txt" leftSection={<IconUpload size={16} />} required={!isEditing} {...form.getInputProps('file')} />
+
+          {/* Upload Progress */}
+          {uploadProgress > 0 && uploadProgress < 100 && <Progress value={uploadProgress} size="sm" animated />}
+
+          <Text size="xs" c="dimmed">
+            <strong>Format yang didukung:</strong> PDF, DOC, DOCX, TXT (Maksimal 10MB)
+          </Text>
+
+          {/* File Info */}
+          {isEditing && article?.filePath && (
+            <Text size="sm" c="blue">
+              📄 File saat ini: {article.filePath.split('/').pop()}
+            </Text>
+          )}
+
+          {/* Actions */}
+          <Group justify="flex-end" mt="lg">
+            <Button variant="light" onClick={onClose} disabled={loading}>
               Batal
             </Button>
-            <Button type="submit" loading={loading}>
-              {isEditing ? 'Simpan Perubahan' : 'Buat Artikel'}
+            <Button type="submit" loading={loading} leftSection={<IconCheck size={16} />}>
+              {isEditing ? 'Simpan Perubahan' : 'Tambah Artikel'}
             </Button>
           </Group>
         </Stack>

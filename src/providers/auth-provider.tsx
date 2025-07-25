@@ -1,340 +1,184 @@
+// src/providers/auth-provider.tsx - DEBUG VERSION
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
-import { User } from '@supabase/supabase-js';
-import { supabase, getUserProfile, updateLastActive } from '@/lib/supabase';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase, User } from '@/lib/supabase';
 import { notifications } from '@mantine/notifications';
-
-interface AuthUser {
-  id: string;
-  email: string;
-  name: string;
-  role: 'ADMIN' | 'USER';
-  group?: string;
-  nim?: string;
-  avatar_url?: string;
-  phone?: string;
-  bio?: string;
-  university?: string;
-  faculty?: string;
-  major?: string;
-  semester?: number;
-  address?: string;
-  birthDate?: string;
-  linkedin?: string;
-  github?: string;
-  website?: string;
-  isEmailVerified?: boolean;
-  isPhoneVerified?: boolean;
-  lastActive?: string;
-  token_balance?: number;
-  settings?: {
-    emailNotifications: boolean;
-    pushNotifications: boolean;
-    darkMode: boolean;
-    language: string;
-    timezone: string;
-    privacy: {
-      showEmail: boolean;
-      showPhone: boolean;
-      showProfile: boolean;
-    };
-  };
-  createdAt?: string;
-  updated_at?: string; // FIXED: Konsisten dengan database
-}
+import { IconCheck, IconX } from '@tabler/icons-react';
 
 interface AuthContextType {
-  user: AuthUser | null;
+  user: User | null;
   loading: boolean;
   signIn: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
-  updateProfile: (data: Partial<AuthUser>) => Promise<void>;
-  isAdmin: () => boolean;
   refreshUser: () => Promise<void>;
+  isAdmin: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        loadUserProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        await loadUserProfile(session.user.id);
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    checkUser();
   }, []);
 
-  const loadUserProfile = async (userId: string) => {
+  const checkUser = async () => {
     try {
-      const { data: profile, error } = await getUserProfile(userId);
+      setLoading(true);
 
-      if (error) {
-        throw error;
-      }
+      const savedUser = localStorage.getItem('mysre_user');
+      if (savedUser) {
+        const userData = JSON.parse(savedUser);
 
-      if (profile) {
-        // Update last active dengan kolom yang benar
-        await supabase
-          .from('User')
-          .update({
-            lastActive: new Date().toISOString(),
-            updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
-          })
-          .eq('id', userId);
+        const { data, error } = await supabase.from('User').select('*').eq('id', userData.id).single();
 
-        // Map database user to AuthUser
-        const authUser: AuthUser = {
-          id: profile.id,
-          email: profile.email,
-          name: profile.name,
-          role: profile.role,
-          group: profile.group || undefined,
-          nim: profile.nim || undefined,
-          avatar_url: profile.avatar_url || undefined,
-          phone: profile.phone || undefined,
-          bio: profile.bio || undefined,
-          university: profile.university || undefined,
-          faculty: profile.faculty || undefined,
-          major: profile.major || undefined,
-          semester: profile.semester || undefined,
-          address: profile.address || undefined,
-          birthDate: profile.birthDate || undefined,
-          linkedin: profile.linkedin || undefined,
-          github: profile.github || undefined,
-          website: profile.website || undefined,
-          isEmailVerified: profile.isEmailVerified,
-          isPhoneVerified: profile.isPhoneVerified,
-          lastActive: profile.lastActive,
-          token_balance: profile.token_balance || 0,
-          settings: profile.settings || {
-            emailNotifications: true,
-            pushNotifications: true,
-            darkMode: false,
-            language: 'id',
-            timezone: 'Asia/Jakarta',
-            privacy: {
-              showEmail: false,
-              showPhone: false,
-              showProfile: true,
-            },
-          },
-          createdAt: profile.createdAt,
-          updated_at: profile.updated_at, // FIXED: Konsisten dengan database
-        };
+        if (data && !error) {
+          await supabase
+            .from('User')
+            .update({
+              lastActive: new Date().toISOString(),
+              updateAt: new Date().toISOString(),
+            })
+            .eq('id', data.id);
 
-        setUser(authUser);
+          setUser(data);
+        } else {
+          localStorage.removeItem('mysre_user');
+          setUser(null);
+        }
       }
     } catch (error) {
-      console.error('Error loading user profile:', error);
-      notifications.show({
-        title: 'Error',
-        message: 'Gagal memuat profil pengguna',
-        color: 'red',
-      });
+      console.error('Error checking user:', error);
+      localStorage.removeItem('mysre_user');
+      setUser(null);
     } finally {
       setLoading(false);
     }
   };
 
   const signIn = async (identifier: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    setLoading(true);
     try {
-      // Try to authenticate with email or NIM
-      let authResult;
+      setLoading(true);
 
-      // First try with email
+      let userData = null;
+
       if (identifier.includes('@')) {
-        authResult = await supabase.auth.signInWithPassword({
-          email: identifier,
-          password,
-        });
-      } else {
-        // Try to find user by NIM first
-        const { data: userWithNim } = await supabase.from('User').select('email').eq('nim', identifier).single();
+        const result = await supabase.from('User').select('*').eq('email', identifier).single();
 
-        if (userWithNim) {
-          authResult = await supabase.auth.signInWithPassword({
-            email: userWithNim.email,
-            password,
-          });
-        } else {
-          return { success: false, error: 'NIM tidak ditemukan' };
+        if (result.data && result.data.password === password) {
+          userData = result.data;
+        }
+      } else {
+        const result = await supabase.from('User').select('*').eq('nim', identifier).single();
+
+        if (result.data && result.data.password === password) {
+          userData = result.data;
         }
       }
 
-      if (authResult.error) {
-        throw authResult.error;
+      if (!userData) {
+        return {
+          success: false,
+          error: 'Email/NIM atau password salah',
+        };
       }
 
-      if (authResult.data.user) {
-        await loadUserProfile(authResult.data.user.id);
-
-        notifications.show({
-          title: 'Berhasil',
-          message: 'Login berhasil!',
-          color: 'green',
-        });
-
-        return { success: true };
+      if (userData.role !== 'ADMIN') {
+        return {
+          success: false,
+          error: 'Hanya administrator yang dapat mengakses dashboard',
+        };
       }
 
-      return { success: false, error: 'Login gagal' };
+      await supabase
+        .from('User')
+        .update({
+          lastActive: new Date().toISOString(),
+          updateAt: new Date().toISOString(),
+        })
+        .eq('id', userData.id);
+
+      setUser(userData);
+      localStorage.setItem('mysre_user', JSON.stringify(userData));
+
+      notifications.show({
+        title: 'Login Berhasil',
+        message: `Selamat datang, ${userData.name || userData.email}!`,
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+
+      return { success: true };
     } catch (error: any) {
       console.error('Login error:', error);
-      return { success: false, error: error.message || 'Terjadi kesalahan saat login' };
+      return {
+        success: false,
+        error: `Terjadi kesalahan saat login: ${error.message}`,
+      };
     } finally {
       setLoading(false);
     }
   };
 
-  const register = async (email: string, password: string, name: string) => {
+  const signOut = async () => {
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-          },
-        },
+      setLoading(true);
+
+      setUser(null);
+      localStorage.removeItem('mysre_user');
+
+      notifications.show({
+        title: 'Logout Berhasil',
+        message: 'Anda telah keluar dari sistem',
+        color: 'blue',
+        icon: <IconCheck size={16} />,
       });
 
-      if (error) {
-        throw new Error(error.message || 'Gagal mendaftar');
-      }
-
-      if (data.user) {
-        // Create user profile in database
-        const { error: profileError } = await supabase.from('User').insert({
-          id: data.user.id,
-          email,
-          name,
-          role: 'USER',
-          isEmailVerified: false,
-          isPhoneVerified: false,
-          token_balance: 0,
-          createdAt: new Date().toISOString(),
-          updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
-          settings: {
-            emailNotifications: true,
-            pushNotifications: true,
-            darkMode: false,
-            language: 'id',
-            timezone: 'Asia/Jakarta',
-            privacy: {
-              showEmail: false,
-              showPhone: false,
-              showProfile: true,
-            },
-          },
-        });
-
-        if (profileError) {
-          throw new Error(profileError.message || 'Gagal membuat profil');
-        }
-      }
-    } catch (error: any) {
-      console.error('Register error:', error);
-      throw new Error(error.message || 'Gagal mendaftar');
-    }
-  };
-
-  const updateProfile = async (data: Partial<AuthUser>) => {
-    if (!user) return;
-
-    try {
-      const { data: updatedProfile, error } = await supabase
-        .from('User')
-        .update({
-          ...data,
-          updated_at: new Date().toISOString(), // FIXED: Gunakan updated_at
-        })
-        .eq('id', user.id)
-        .select('*')
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      if (updatedProfile) {
-        await loadUserProfile(user.id);
-      }
-    } catch (error: any) {
-      console.error('Update profile error:', error);
-      throw new Error(error.message || 'Gagal memperbarui profil');
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const refreshUser = async () => {
-    if (!user?.id) return;
+    if (!user) return;
 
     try {
-      await loadUserProfile(user.id);
+      const { data, error } = await supabase.from('User').select('*').eq('id', user.id).single();
+
+      if (data && !error) {
+        setUser(data);
+        localStorage.setItem('mysre_user', JSON.stringify(data));
+      }
     } catch (error) {
       console.error('Error refreshing user:', error);
     }
   };
 
-  const signOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        throw error;
-      }
-      setUser(null);
-
-      notifications.show({
-        title: 'Berhasil',
-        message: 'Logout berhasil!',
-        color: 'green',
-      });
-    } catch (error: any) {
-      console.error('Logout error:', error);
-      notifications.show({
-        title: 'Error',
-        message: error.message || 'Gagal logout',
-        color: 'red',
-      });
-    }
-  };
-
-  const isAdmin = () => {
+  const isAdmin = (): boolean => {
+    console.log('isAdmin called, user:', user);
     return user?.role === 'ADMIN';
   };
 
+  // DEBUG: Log the context value
   const value: AuthContextType = {
     user,
     loading,
     signIn,
     signOut,
-    register,
-    updateProfile,
-    isAdmin,
     refreshUser,
+    isAdmin,
   };
+
+  console.log('AuthProvider value:', value);
+  console.log('isAdmin function:', value.isAdmin);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -344,5 +188,23 @@ export function useAuth() {
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
+
+  // DEBUG: Log what we're returning
+  console.log('useAuth returning:', context);
+  console.log('isAdmin in useAuth:', context.isAdmin);
+
   return context;
+}
+
+export function useRequireAdmin() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && (!user || user.role !== 'ADMIN')) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
+
+  return { user, loading };
 }
