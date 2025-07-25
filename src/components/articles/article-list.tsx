@@ -1,15 +1,65 @@
+// src/components/articles/article-list.tsx - ENHANCED UI with Detail Page
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Table, Avatar, Badge, Group, Text, ActionIcon, Menu, Button, Paper, TextInput, Select, Stack, Flex, Box, ScrollArea, Pagination, Card, Title, LoadingOverlay, Tabs, Alert, Modal, FileInput, Textarea } from '@mantine/core';
-import { IconDots, IconEdit, IconTrash, IconPlus, IconSearch, IconFilter, IconFileText, IconDownload, IconEye, IconUsers, IconSchool, IconId, IconAlertCircle, IconCalendar, IconUpload, IconCheck, IconX } from '@tabler/icons-react';
+import {
+  Table,
+  Avatar,
+  Badge,
+  Group,
+  Text,
+  ActionIcon,
+  Menu,
+  Button,
+  Paper,
+  TextInput,
+  Stack,
+  Box,
+  ScrollArea,
+  Pagination,
+  Title,
+  LoadingOverlay,
+  Tabs,
+  Alert,
+  Modal,
+  FileInput,
+  Textarea,
+  Card,
+  Divider,
+  ThemeIcon,
+  Anchor,
+  Tooltip,
+  Grid,
+  Container,
+} from '@mantine/core';
+import {
+  IconDots,
+  IconEdit,
+  IconTrash,
+  IconPlus,
+  IconSearch,
+  IconFileText,
+  IconDownload,
+  IconEye,
+  IconUsers,
+  IconAlertCircle,
+  IconCalendar,
+  IconUser,
+  IconArrowLeft,
+  IconFile,
+  IconTag,
+  IconClock,
+  IconExternalLink,
+  IconHash,
+  IconBook,
+} from '@tabler/icons-react';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { useForm } from '@mantine/form';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 
-// Define Article interface locally since it's not exported from supabase
+// Interface Article yang lengkap sesuai database
 interface Article {
   id: string;
   title: string;
@@ -17,33 +67,53 @@ interface Article {
   sessionId?: string;
   userId?: string;
   createdAt: string;
-  updatedAt?: string;
-  author?: {
+  updateAt?: string;
+  abstract?: string;
+  author?: string;
+  doi?: string;
+  keywords?: string;
+  year?: string;
+  user?: {
     id: string;
     name: string;
     email: string;
     role: 'ADMIN' | 'USER';
     group?: string;
     nim?: string;
-    avatar_url?: string; // Tambah ini
+    avatar_url?: string;
   };
 }
 
-// Simple Article Form Component
-function SimpleArticleForm({ article, onClose, onSuccess }: { article?: any; onClose: () => void; onSuccess: () => void }) {
+interface ArticleFormProps {
+  isEditing: boolean;
+  article?: Article | null;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+// Article Form Component
+function ArticleForm({ isEditing, article, onClose, onSuccess }: ArticleFormProps) {
   const [loading, setLoading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const { user } = useAuth();
-  const isEditing = !!article;
 
   const form = useForm({
     initialValues: {
       title: article?.title || '',
-      description: '',
-      file: null,
+      abstract: article?.abstract || '',
+      author: article?.author || '',
+      doi: article?.doi || '',
+      keywords: article?.keywords || '',
+      year: article?.year || '',
+      file: null as File | null,
     },
     validate: {
       title: (value) => (value.length < 3 ? 'Judul minimal 3 karakter' : null),
+      year: (value) => {
+        if (value && (!/^\d{4}$/.test(value) || parseInt(value) < 1900 || parseInt(value) > new Date().getFullYear() + 10)) {
+          return 'Tahun harus berupa 4 digit angka yang valid';
+        }
+        return null;
+      },
       file: (value) => {
         if (!isEditing && !value) {
           return 'File PDF/Document harus diupload';
@@ -53,77 +123,47 @@ function SimpleArticleForm({ article, onClose, onSuccess }: { article?: any; onC
     },
   });
 
-  const uploadFileToStorage = async (file: File): Promise<string> => {
-    try {
-      const timestamp = Date.now();
-      const randomStr = Math.random().toString(36).substring(7);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${timestamp}-${randomStr}.${fileExt}`;
-      const filePath = `articles/${fileName}`;
-
-      console.log('📤 Uploading file to:', filePath);
-      setUploadProgress(20);
-
-      const { data, error: uploadError } = await supabase.storage.from('documents').upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
-
-      if (uploadError) {
-        if (uploadError.message.includes('Bucket not found')) {
-          throw new Error('Storage bucket belum dibuat. Silakan buat bucket "documents" di Supabase Dashboard > Storage');
-        }
-        throw new Error(`Upload failed: ${uploadError.message}`);
-      }
-
-      setUploadProgress(70);
-
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
-
-      setUploadProgress(100);
-      console.log('✅ Upload successful:', urlData.publicUrl);
-      return urlData.publicUrl;
-    } catch (error) {
-      console.error('Upload failed:', error);
-      throw error;
-    }
-  };
-
   const handleSubmit = async (values: any) => {
     setLoading(true);
-    setUploadProgress(0);
 
     try {
       let filePath = article?.filePath || '';
 
+      // Handle file upload
       if (values.file) {
-        try {
-          filePath = await uploadFileToStorage(values.file);
-        } catch (uploadError) {
-          notifications.show({
-            title: 'Error Upload',
-            message: uploadError instanceof Error ? uploadError.message : 'Gagal upload file',
-            color: 'red',
-          });
-          setLoading(false);
-          return;
+        const file = values.file;
+        const fileName = `${Date.now()}_${file.name}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage.from('documents').upload(fileName, file);
+
+        if (uploadError) {
+          throw new Error(`Upload failed: ${uploadError.message}`);
         }
+
+        filePath = uploadData.path;
       }
 
+      const articleData = {
+        title: values.title,
+        filePath: filePath,
+        userId: user?.id || null,
+        abstract: values.abstract || null,
+        author: values.author || null,
+        doi: values.doi || null,
+        keywords: values.keywords || null,
+        year: values.year || null,
+      };
+
       if (isEditing && article) {
-        const updateData = {
-          title: values.title,
-          filePath: filePath,
-          updateAt: new Date().toISOString(), // Sesuai dengan schema SQL (updateAt bukan updated_at)
-        };
+        const response = await fetch('/api/articles', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: article.id, ...articleData }),
+        });
 
-        console.log('📝 Updating article:', article.id, 'with data:', updateData);
-
-        const { error } = await supabase.from('Article').update(updateData).eq('id', article.id);
-
-        if (error) {
-          console.error('🚨 Update error:', error);
-          throw new Error(`Update failed: ${error.message}`);
+        if (!response.ok) {
+          const result = await response.json();
+          throw new Error(result.error || 'Update failed');
         }
 
         notifications.show({
@@ -132,28 +172,16 @@ function SimpleArticleForm({ article, onClose, onSuccess }: { article?: any; onC
           color: 'green',
         });
       } else {
-        // Generate ID manual karena table tidak auto-increment
-        const timestamp = Date.now();
-        const randomStr = Math.random().toString(36).substring(2, 10);
-        const articleId = `art_${timestamp}_${randomStr}`;
+        const response = await fetch('/api/articles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(articleData),
+        });
 
-        const insertData = {
-          id: articleId, // HARUS ada ID manual
-          title: values.title,
-          filePath: filePath,
-          userId: user?.id || null,
-        };
-
-        console.log('📝 Inserting article data (with manual ID):', insertData);
-
-        const { error, data } = await supabase.from('Article').insert(insertData).select();
-
-        if (error) {
-          console.error('🚨 Insert error:', error);
-          throw new Error(`Database error: ${error.message || 'Unknown error'}`);
+        if (!response.ok) {
+          const result = await response.json();
+          throw new Error(result.error || 'Create failed');
         }
-
-        console.log('✅ Article created successfully:', data);
 
         notifications.show({
           title: 'Berhasil',
@@ -172,7 +200,6 @@ function SimpleArticleForm({ article, onClose, onSuccess }: { article?: any; onC
       });
     } finally {
       setLoading(false);
-      setUploadProgress(0);
     }
   };
 
@@ -181,76 +208,252 @@ function SimpleArticleForm({ article, onClose, onSuccess }: { article?: any; onC
       <Stack gap="md">
         <TextInput label="Judul Artikel" placeholder="Masukkan judul artikel" required {...form.getInputProps('title')} />
 
-        <Textarea label="Deskripsi (Opsional)" placeholder="Deskripsi singkat tentang artikel" rows={3} {...form.getInputProps('description')} />
+        <Textarea label="Abstract" placeholder="Abstract artikel (opsional)" rows={4} {...form.getInputProps('abstract')} />
 
-        <FileInput
-          label={isEditing ? 'Upload File Baru (Opsional)' : 'Upload File PDF/Document'}
-          placeholder="Pilih file PDF, DOC, atau DOCX"
-          leftSection={<IconUpload size={16} />}
-          accept=".pdf,.doc,.docx"
-          required={!isEditing}
-          {...form.getInputProps('file')}
-        />
+        <Group grow>
+          <TextInput label="Author" placeholder="Nama penulis (opsional)" {...form.getInputProps('author')} />
+          <TextInput label="Tahun" placeholder="Tahun publikasi" {...form.getInputProps('year')} />
+        </Group>
 
-        {loading && uploadProgress > 0 && (
-          <Box>
-            <Text size="sm" c="blue" mb="xs">
-              Uploading: {uploadProgress}%
-            </Text>
-            <div
-              style={{
-                width: '100%',
-                height: '8px',
-                backgroundColor: '#e9ecef',
-                borderRadius: '4px',
-                overflow: 'hidden',
-              }}
-            >
-              <div
-                style={{
-                  width: `${uploadProgress}%`,
-                  height: '100%',
-                  backgroundColor: '#228be6',
-                  transition: 'width 0.3s ease',
-                }}
-              />
-            </div>
-          </Box>
-        )}
+        <TextInput label="DOI" placeholder="Digital Object Identifier (opsional)" {...form.getInputProps('doi')} />
 
-        {isEditing && article?.filePath && (
-          <Box p="md" style={{ backgroundColor: 'var(--mantine-color-gray-0)', borderRadius: '8px' }}>
-            <Text size="sm" fw={500} mb="xs">
-              File Saat Ini:
-            </Text>
-            <Group gap="xs">
-              <IconFileText size={16} color="var(--mantine-color-red-6)" />
-              <Text size="sm" c="gray.7">
-                {article.filePath.split('/').pop()}
-              </Text>
-            </Group>
-          </Box>
-        )}
+        <TextInput label="Keywords" placeholder="Kata kunci (pisahkan dengan koma)" {...form.getInputProps('keywords')} />
 
-        <Box p="md" style={{ backgroundColor: 'var(--mantine-color-blue-0)', borderRadius: '8px' }}>
-          <Text size="sm" fw={500} mb="xs">
-            Penulis:
-          </Text>
-          <Text size="sm">
-            <strong>{user?.name}</strong> ({user?.role === 'ADMIN' ? 'Administrator' : 'Mahasiswa'})
-          </Text>
-        </Box>
+        <FileInput label={isEditing ? 'File Baru (Opsional)' : 'File PDF Artikel'} placeholder="Pilih file PDF" accept="application/pdf" required={!isEditing} {...form.getInputProps('file')} />
 
         <Group justify="flex-end" mt="md">
           <Button variant="subtle" onClick={onClose} disabled={loading}>
             Batal
           </Button>
           <Button type="submit" loading={loading}>
-            {loading ? (uploadProgress > 0 ? `Uploading ${uploadProgress}%` : 'Menyimpan...') : isEditing ? 'Simpan Perubahan' : 'Buat Artikel'}
+            {isEditing ? 'Simpan Perubahan' : 'Buat Artikel'}
           </Button>
         </Group>
       </Stack>
     </form>
+  );
+}
+
+// Article Detail Modal Component
+function ArticleDetailModal({ article, opened, onClose }: { article: Article | null; opened: boolean; onClose: () => void }) {
+  if (!article) return null;
+
+  const handleDownload = async () => {
+    try {
+      if (!article.filePath) {
+        notifications.show({
+          title: 'Error',
+          message: 'File tidak tersedia untuk didownload',
+          color: 'red',
+        });
+        return;
+      }
+
+      const { data, error } = await supabase.storage.from('documents').download(article.filePath);
+
+      if (error) throw error;
+
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${article.title}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      notifications.show({
+        title: 'Berhasil',
+        message: 'File berhasil didownload',
+        color: 'green',
+      });
+    } catch (error) {
+      notifications.show({
+        title: 'Error',
+        message: 'Gagal download file',
+        color: 'red',
+      });
+    }
+  };
+
+  return (
+    <Modal opened={opened} onClose={onClose} title={null} size="xl" padding="xl">
+      <Stack gap="lg">
+        {/* Header */}
+        <Group justify="space-between" align="flex-start">
+          <Box style={{ flex: 1 }}>
+            <Title order={2} mb="xs">
+              {article.title}
+            </Title>
+            {article.year && (
+              <Badge variant="light" color="blue" mb="sm">
+                {article.year}
+              </Badge>
+            )}
+          </Box>
+          <Group gap="xs">
+            <ActionIcon variant="light" onClick={handleDownload} disabled={!article.filePath}>
+              <IconDownload size={16} />
+            </ActionIcon>
+            <ActionIcon variant="subtle" onClick={onClose}>
+              <IconArrowLeft size={16} />
+            </ActionIcon>
+          </Group>
+        </Group>
+
+        <Divider />
+
+        {/* Content */}
+        <Grid>
+          <Grid.Col span={8}>
+            {/* Abstract */}
+            {article.abstract && (
+              <Card withBorder mb="md">
+                <Group mb="sm">
+                  <ThemeIcon variant="light" color="blue">
+                    <IconBook size={16} />
+                  </ThemeIcon>
+                  <Text fw={600}>Abstract</Text>
+                </Group>
+                <Text size="sm" style={{ lineHeight: 1.6 }}>
+                  {article.abstract}
+                </Text>
+              </Card>
+            )}
+
+            {/* Keywords */}
+            {article.keywords && (
+              <Card withBorder mb="md">
+                <Group mb="sm">
+                  <ThemeIcon variant="light" color="green">
+                    <IconTag size={16} />
+                  </ThemeIcon>
+                  <Text fw={600}>Keywords</Text>
+                </Group>
+                <Group gap="xs">
+                  {article.keywords.split(',').map((keyword, index) => (
+                    <Badge key={index} variant="outline" size="sm">
+                      {keyword.trim()}
+                    </Badge>
+                  ))}
+                </Group>
+              </Card>
+            )}
+
+            {/* File Info */}
+            <Card withBorder>
+              <Group mb="sm">
+                <ThemeIcon variant="light" color="orange">
+                  <IconFile size={16} />
+                </ThemeIcon>
+                <Text fw={600}>File Information</Text>
+              </Group>
+              <Group gap="md">
+                <Text size="sm">
+                  <Text span fw={500}>
+                    Filename:{' '}
+                  </Text>
+                  {article.filePath ? article.filePath.split('/').pop() : 'No file available'}
+                </Text>
+                {article.filePath && (
+                  <Button variant="light" size="xs" onClick={handleDownload}>
+                    Download PDF
+                  </Button>
+                )}
+              </Group>
+            </Card>
+          </Grid.Col>
+
+          <Grid.Col span={4}>
+            {/* Author Info */}
+            <Card withBorder mb="md">
+              <Group mb="sm">
+                <ThemeIcon variant="light" color="grape">
+                  <IconUser size={16} />
+                </ThemeIcon>
+                <Text fw={600}>Author Information</Text>
+              </Group>
+              <Stack gap="sm">
+                {article.author && (
+                  <Text size="sm">
+                    <Text span fw={500}>
+                      Author:{' '}
+                    </Text>
+                    {article.author}
+                  </Text>
+                )}
+                {article.user && (
+                  <Group gap="sm">
+                    <Avatar src={article.user.avatar_url} size="sm">
+                      {article.user.name?.charAt(0)}
+                    </Avatar>
+                    <Box>
+                      <Text size="sm" fw={500}>
+                        {article.user.name}
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        {article.user.email}
+                      </Text>
+                      <Badge size="xs" color={article.user.role === 'ADMIN' ? 'red' : 'blue'}>
+                        {article.user.role === 'ADMIN' ? 'Administrator' : 'Mahasiswa'}
+                      </Badge>
+                    </Box>
+                  </Group>
+                )}
+              </Stack>
+            </Card>
+
+            {/* Metadata */}
+            <Card withBorder>
+              <Group mb="sm">
+                <ThemeIcon variant="light" color="cyan">
+                  <IconHash size={16} />
+                </ThemeIcon>
+                <Text fw={600}>Metadata</Text>
+              </Group>
+              <Stack gap="xs">
+                {article.doi && (
+                  <Text size="sm">
+                    <Text span fw={500}>
+                      DOI:{' '}
+                    </Text>
+                    <Anchor href={`https://doi.org/${article.doi}`} target="_blank" size="sm">
+                      {article.doi}
+                    </Anchor>
+                  </Text>
+                )}
+                <Text size="sm">
+                  <Text span fw={500}>
+                    Created:{' '}
+                  </Text>
+                  {new Date(article.createdAt).toLocaleDateString('id-ID', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </Text>
+                {article.updateAt && article.updateAt !== article.createdAt && (
+                  <Text size="sm">
+                    <Text span fw={500}>
+                      Updated:{' '}
+                    </Text>
+                    {new Date(article.updateAt).toLocaleDateString('id-ID', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                )}
+              </Stack>
+            </Card>
+          </Grid.Col>
+        </Grid>
+      </Stack>
+    </Modal>
   );
 }
 
@@ -266,8 +469,10 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const [activePage, setActivePage] = useState(1);
   const [total, setTotal] = useState(0);
   const [showForm, setShowForm] = useState(false);
-  const [editingArticle, setEditingArticle] = useState<any | null>(null);
+  const [editingArticle, setEditingArticle] = useState<Article | null>(null);
   const [activeTab, setActiveTab] = useState<string>('all');
+  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+  const [showDetail, setShowDetail] = useState(false);
 
   const { isAdmin, user } = useAuth();
   const pageSize = 10;
@@ -281,50 +486,29 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
     setError(null);
 
     try {
-      console.log('🔍 Fetching articles...');
-
-      let query = supabase.from('Article').select('*', { count: 'exact' });
+      const params = new URLSearchParams({
+        page: activePage.toString(),
+        limit: pageSize.toString(),
+      });
 
       if (activeTab === 'my-articles' && user) {
-        console.log('🔍 Applying my articles filter');
-        query = query.eq('userId', user.id);
+        params.append('userId', user.id);
       }
 
       if (searchQuery && searchQuery.trim()) {
-        console.log('🔍 Applying search filter:', searchQuery);
-        query = query.ilike('title', `%${searchQuery}%`);
+        params.append('search', searchQuery.trim());
       }
 
-      query = query.order('createdAt', { ascending: false });
+      const response = await fetch(`/api/articles?${params}`);
+      const data = await response.json();
 
-      const from = (activePage - 1) * pageSize;
-      const to = from + pageSize - 1;
-      query = query.range(from, to);
-
-      console.log('🔍 Executing query...');
-      const { data, error, count } = await query;
-
-      if (error) {
-        console.error('🚨 Query error:', error);
-        throw error;
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch articles');
       }
 
-      const articlesWithAuthors = await Promise.all(
-        (data || []).map(async (article) => {
-          if (article.userId) {
-            const { data: userData } = await supabase.from('User').select('id, name, email, role, group, nim, avatar_url').eq('id', article.userId).single();
-            return { ...article, author: userData };
-          }
-          return { ...article, author: null };
-        }),
-      );
-
-      setArticles(articlesWithAuthors);
-      setTotal(count || 0);
-
-      console.log('✅ Articles loaded successfully:', articlesWithAuthors.length, 'total:', count);
+      setArticles(data.articles || []);
+      setTotal(data.total || 0);
     } catch (error: any) {
-      console.error('🚨 Error fetching articles:', error);
       setError(error.message || 'Gagal memuat data artikel');
       setArticles([]);
       setTotal(0);
@@ -339,7 +523,20 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
     }
   };
 
-  const handleDelete = async (article: any) => {
+  const handleView = (article: Article) => {
+    setSelectedArticle(article);
+    setShowDetail(true);
+    if (onArticleSelect) {
+      onArticleSelect(article);
+    }
+  };
+
+  const handleEdit = (article: Article) => {
+    setEditingArticle(article);
+    setShowForm(true);
+  };
+
+  const handleDelete = async (article: Article) => {
     modals.openConfirmModal({
       title: 'Hapus Artikel',
       children: (
@@ -351,18 +548,26 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
       confirmProps: { color: 'red' },
       onConfirm: async () => {
         try {
-          const { error } = await supabase.from('Article').delete().eq('id', article.id);
-          if (error) throw error;
+          const response = await fetch(`/api/articles?id=${article.id}`, {
+            method: 'DELETE',
+          });
+
+          if (!response.ok) {
+            const result = await response.json();
+            throw new Error(result.error || 'Delete failed');
+          }
+
           notifications.show({
             title: 'Berhasil',
             message: 'Artikel berhasil dihapus',
             color: 'green',
           });
+
           fetchArticles();
         } catch (error: any) {
           notifications.show({
             title: 'Error',
-            message: `Gagal menghapus artikel: ${error.message}`,
+            message: error.message || 'Gagal menghapus artikel',
             color: 'red',
           });
         }
@@ -370,97 +575,80 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
     });
   };
 
-  const handleEdit = (article: any) => {
-    setEditingArticle(article);
-    setShowForm(true);
-  };
-
-  const handleView = (article: any) => {
-    if (!article.filePath) {
-      notifications.show({
-        title: 'File Tidak Tersedia',
-        message: 'File untuk artikel ini tidak ditemukan',
-        color: 'orange',
-      });
-      return;
-    }
-
-    if (article.filePath.startsWith('http')) {
-      window.open(article.filePath, '_blank');
-    } else {
-      notifications.show({
-        title: 'File Path',
-        message: `File location: ${article.filePath}`,
-        color: 'blue',
-      });
-    }
-  };
-
-  const handleDownload = async (article: any) => {
-    if (!article.filePath) {
-      notifications.show({
-        title: 'File Tidak Tersedia',
-        message: 'File untuk artikel ini tidak ditemukan',
-        color: 'orange',
-      });
-      return;
-    }
-
+  const handleDownload = async (article: Article) => {
     try {
-      if (article.filePath.startsWith('http')) {
-        const link = document.createElement('a');
-        link.href = article.filePath;
-        link.download = article.title + '.pdf';
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
+      if (!article.filePath) {
         notifications.show({
-          title: 'Download',
-          message: 'File sedang didownload...',
-          color: 'green',
+          title: 'Error',
+          message: 'File tidak tersedia untuk didownload',
+          color: 'red',
         });
+        return;
       }
-    } catch (error) {
+
+      const { data, error } = await supabase.storage.from('documents').download(article.filePath);
+
+      if (error) throw error;
+
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${article.title}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
       notifications.show({
-        title: 'Error Download',
-        message: 'Gagal mendownload file',
+        title: 'Berhasil',
+        message: 'File berhasil didownload',
+        color: 'green',
+      });
+    } catch (error: any) {
+      notifications.show({
+        title: 'Error',
+        message: 'Gagal download file',
         color: 'red',
       });
     }
   };
 
-  const handleFormClose = () => {
-    setShowForm(false);
-    setEditingArticle(null);
-    fetchArticles();
+  const formatAuthor = (article: Article) => {
+    if (article.author) return article.author;
+    if (article.user?.name) return article.user.name;
+    return 'Unknown Author';
   };
 
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <Stack gap="md">
-      <Card withBorder shadow="sm" radius="md">
-        <Group justify="space-between" mb="md">
-          <Title order={3}>Manajemen Artikel</Title>
-          {isAdmin() && (
-            <Button leftSection={<IconPlus size={16} />} onClick={() => setShowForm(true)}>
-              Tambah Artikel
-            </Button>
-          )}
+    <Container size="xl">
+      <Stack gap="md">
+        {/* Header */}
+        <Group justify="space-between">
+          <Box>
+            <Title order={2}>Manajemen Artikel</Title>
+            <Text size="sm" c="dimmed">
+              Kelola artikel penelitian dan dokumen ({total} artikel)
+            </Text>
+          </Box>
+          <Button leftSection={<IconPlus size={16} />} onClick={() => setShowForm(true)}>
+            Tambah Artikel
+          </Button>
         </Group>
 
+        {/* Error Alert */}
         {error && (
-          <Alert icon={<IconAlertCircle size={16} />} title="Error" color="red" mb="md" onClose={() => setError(null)} withCloseButton>
+          <Alert icon={<IconAlertCircle size={16} />} title="Error" color="red" onClose={() => setError(null)} withCloseButton>
             {error}
           </Alert>
         )}
 
-        <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'all')} mb="md">
+        {/* Tabs */}
+        <Tabs value={activeTab} onChange={(value) => setActiveTab(value || 'all')}>
           <Tabs.List>
             <Tabs.Tab value="all" leftSection={<IconFileText size={16} />}>
-              Semua Artikel
+              Semua Artikel ({total})
             </Tabs.Tab>
             <Tabs.Tab value="my-articles" leftSection={<IconUsers size={16} />}>
               Artikel Saya
@@ -468,79 +656,110 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
           </Tabs.List>
         </Tabs>
 
-        <Group mb="md">
-          <TextInput placeholder="Cari judul artikel..." leftSection={<IconSearch size={16} />} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ flex: 1 }} />
-        </Group>
+        {/* Search */}
+        <TextInput placeholder="Cari judul artikel, author, atau kata kunci..." leftSection={<IconSearch size={16} />} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} size="md" />
 
-        <Paper withBorder radius="md" style={{ position: 'relative' }}>
+        {/* Table */}
+        <Paper withBorder radius="md">
           <LoadingOverlay visible={loading} />
           <ScrollArea>
-            <Table highlightOnHover verticalSpacing="sm">
+            <Table highlightOnHover verticalSpacing="md" horizontalSpacing="lg">
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>Artikel</Table.Th>
-                  <Table.Th>Penulis</Table.Th>
-                  <Table.Th>Role</Table.Th>
-                  <Table.Th>Dibuat</Table.Th>
-                  <Table.Th>Aksi</Table.Th>
+                  <Table.Th style={{ minWidth: '300px' }}>Artikel</Table.Th>
+                  <Table.Th style={{ minWidth: '200px' }}>Author</Table.Th>
+                  <Table.Th style={{ minWidth: '150px' }}>Uploader</Table.Th>
+                  <Table.Th style={{ minWidth: '120px' }}>Tanggal</Table.Th>
+                  <Table.Th style={{ minWidth: '100px' }} ta="center">
+                    Aksi
+                  </Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
                 {articles.map((article) => (
-                  <Table.Tr key={article.id} style={{ cursor: onArticleSelect ? 'pointer' : 'default' }} onClick={() => onArticleSelect?.(article)}>
+                  <Table.Tr key={article.id}>
                     <Table.Td>
-                      <Group gap="sm">
-                        <IconFileText size={20} color="var(--mantine-color-red-6)" />
-                        <Box>
-                          <Text size="sm" fw={500} lineClamp={2}>
+                      <Group gap="sm" align="flex-start">
+                        <ThemeIcon variant="light" color="blue" size="lg">
+                          <IconFileText size={20} />
+                        </ThemeIcon>
+                        <Box style={{ flex: 1 }}>
+                          <Text size="sm" fw={600} lineClamp={2} mb={4}>
                             {article.title}
                           </Text>
-                          <Text size="xs" c="gray.6" lineClamp={1}>
-                            {article.filePath ? article.filePath.split('/').pop() : 'No file'}
-                          </Text>
+                          {article.abstract && (
+                            <Text size="xs" c="dimmed" lineClamp={2} mb={4}>
+                              {article.abstract}
+                            </Text>
+                          )}
+                          <Group gap="xs">
+                            {article.year && (
+                              <Badge size="xs" variant="light" color="blue">
+                                {article.year}
+                              </Badge>
+                            )}
+                            {article.keywords && (
+                              <Badge size="xs" variant="outline" color="gray">
+                                {article.keywords.split(',').length} keywords
+                              </Badge>
+                            )}
+                            {article.doi && (
+                              <Badge size="xs" variant="outline" color="green">
+                                DOI
+                              </Badge>
+                            )}
+                          </Group>
                         </Box>
                       </Group>
                     </Table.Td>
                     <Table.Td>
+                      <Text size="sm" fw={500}>
+                        {formatAuthor(article)}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
                       <Group gap="sm">
-                        <Avatar src={article.author?.avatar_url} size="sm" color="blue">
-                          {article.author?.name?.charAt(0) || 'U'}
+                        <Avatar src={article.user?.avatar_url} size="sm" color="blue">
+                          {article.user?.name?.charAt(0) || 'U'}
                         </Avatar>
                         <Box>
                           <Text size="sm" fw={500}>
-                            {article.author?.name || 'Unknown'}
+                            {article.user?.name || 'Unknown'}
                           </Text>
-                          <Text size="xs" c="gray.6">
-                            {article.author?.email || '-'}
-                          </Text>
+                          <Badge size="xs" color={article.user?.role === 'ADMIN' ? 'red' : 'blue'}>
+                            {article.user?.role === 'ADMIN' ? 'Admin' : 'User'}
+                          </Badge>
                         </Box>
                       </Group>
                     </Table.Td>
                     <Table.Td>
-                      <Badge color={article.author?.role === 'ADMIN' ? 'red' : 'blue'} variant="light">
-                        {article.author?.role === 'ADMIN' ? 'Administrator' : 'Mahasiswa'}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>
                       <Group gap="xs">
-                        <IconCalendar size={14} />
-                        <Text size="sm" c="gray.7">
-                          {new Date(article.createdAt).toLocaleDateString('id-ID')}
+                        <IconCalendar size={14} color="var(--mantine-color-gray-6)" />
+                        <Text size="sm" c="dimmed">
+                          {new Date(article.createdAt).toLocaleDateString('id-ID', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
                         </Text>
                       </Group>
                     </Table.Td>
                     <Table.Td>
-                      <Group gap="xs">
-                        <ActionIcon variant="subtle" color="blue" onClick={() => handleView(article)} size="sm" title="View file">
-                          <IconEye size={16} />
-                        </ActionIcon>
-                        <ActionIcon variant="subtle" color="green" onClick={() => handleDownload(article)} size="sm" title="Download file">
-                          <IconDownload size={16} />
-                        </ActionIcon>
-                        {(isAdmin() || article.userId === user?.id) && (
-                          <Menu shadow="md" width={200}>
+                      <Group gap="xs" justify="center">
+                        <Tooltip label="Lihat Detail">
+                          <ActionIcon variant="subtle" color="blue" onClick={() => handleView(article)}>
+                            <IconEye size={16} />
+                          </ActionIcon>
+                        </Tooltip>
+                        <Tooltip label="Download">
+                          <ActionIcon variant="subtle" color="green" onClick={() => handleDownload(article)} disabled={!article.filePath}>
+                            <IconDownload size={16} />
+                          </ActionIcon>
+                        </Tooltip>
+                        {(isAdmin || article.userId === user?.id) && (
+                          <Menu position="bottom-end">
                             <Menu.Target>
-                              <ActionIcon variant="subtle" color="gray" size="sm">
+                              <ActionIcon variant="subtle" color="gray">
                                 <IconDots size={16} />
                               </ActionIcon>
                             </Menu.Target>
@@ -564,39 +783,57 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
 
           {articles.length === 0 && !loading && !error && (
             <Box p="xl" ta="center">
-              <Text c="gray.5">{activeTab === 'my-articles' ? 'Anda belum memiliki artikel' : 'Tidak ada artikel ditemukan'}</Text>
+              <ThemeIcon size="xl" variant="light" color="gray" mb="md" mx="auto">
+                <IconFileText size={32} />
+              </ThemeIcon>
+              <Text c="dimmed" size="lg" fw={500} mb="xs">
+                {activeTab === 'my-articles' ? 'Anda belum memiliki artikel' : 'Belum ada artikel'}
+              </Text>
+              <Text c="dimmed" size="sm">
+                {searchQuery ? 'Tidak ada artikel yang sesuai dengan pencarian.' : 'Mulai dengan menambahkan artikel pertama Anda.'}
+              </Text>
             </Box>
           )}
         </Paper>
 
+        {/* Pagination */}
         {totalPages > 1 && (
-          <Flex justify="center" mt="md">
-            <Pagination value={activePage} onChange={setActivePage} total={totalPages} size="sm" />
-          </Flex>
+          <Group justify="center">
+            <Pagination value={activePage} onChange={setActivePage} total={totalPages} size="sm" showFirst showLast />
+          </Group>
         )}
 
-        <Group justify="space-between" mt="md">
-          <Text size="sm" c="gray.6">
-            Menampilkan {articles.length} dari {total} artikel
-          </Text>
-        </Group>
-      </Card>
-
-      {showForm && (
+        {/* Form Modal */}
         <Modal
           opened={showForm}
-          onClose={handleFormClose}
-          title={
-            <Text size="lg" fw={600}>
-              {editingArticle ? 'Edit Artikel' : 'Tambah Artikel Baru'}
-            </Text>
-          }
-          size="md"
-          closeOnClickOutside={false}
+          onClose={() => {
+            setShowForm(false);
+            setEditingArticle(null);
+          }}
+          title={editingArticle ? 'Edit Artikel' : 'Tambah Artikel Baru'}
+          size="lg"
         >
-          <SimpleArticleForm article={editingArticle} onClose={handleFormClose} onSuccess={fetchArticles} />
+          <ArticleForm
+            isEditing={!!editingArticle}
+            article={editingArticle}
+            onClose={() => {
+              setShowForm(false);
+              setEditingArticle(null);
+            }}
+            onSuccess={fetchArticles}
+          />
         </Modal>
-      )}
-    </Stack>
+
+        {/* Detail Modal */}
+        <ArticleDetailModal
+          article={selectedArticle}
+          opened={showDetail}
+          onClose={() => {
+            setShowDetail(false);
+            setSelectedArticle(null);
+          }}
+        />
+      </Stack>
+    </Container>
   );
 }

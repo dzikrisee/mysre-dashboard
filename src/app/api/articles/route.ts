@@ -1,4 +1,4 @@
-// src/app/api/articles/route.ts - UPDATED FOR PRISMA SCHEMA
+// src/app/api/articles/route.ts - FIXED FOR PRISMA SCHEMA
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
@@ -14,11 +14,22 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10');
     const offset = (page - 1) * limit;
 
-    // ✅ UPDATED: Query dengan join ke User table sesuai Prisma schema
+    // ✅ FIXED: Sesuaikan dengan skema Prisma database utama
     let query = supabase.from('Article').select(
       `
-        *,
-        user:User(id, name, email, role, group, nim, avatar_url)
+        id,
+        title,
+        filePath,
+        createdAt,
+        updateAt,
+        userId,
+        sessionId,
+        abstract,
+        author,
+        doi,
+        keywords,
+        year,
+        user:userId(id, name, email, role, group, nim, avatar_url)
       `,
       { count: 'exact' },
     );
@@ -40,7 +51,7 @@ export async function GET(request: NextRequest) {
       query = query.ilike('author', `%${author}%`);
     }
 
-    // ✅ FIXED: Order by createdAt (camelCase sesuai Prisma)
+    // ✅ FIXED: Order by createdAt (sesuai Prisma schema)
     query = query.order('createdAt', { ascending: false }).range(offset, offset + limit - 1);
 
     const { data: articles, error, count } = await query;
@@ -90,16 +101,7 @@ export async function POST(request: NextRequest) {
       updateAt: new Date().toISOString(), // ✅ FIXED: updateAt sesuai Prisma
     };
 
-    const { data: newArticle, error } = await supabase
-      .from('Article')
-      .insert(articleData)
-      .select(
-        `
-        *,
-        user:User(id, name, email, role, group, nim, avatar_url)
-      `,
-      )
-      .single();
+    const { data: newArticle, error } = await supabase.from('Article').insert(articleData).select('*').single();
 
     if (error) {
       console.error('Error creating article:', error);
@@ -142,17 +144,7 @@ export async function PUT(request: NextRequest) {
       updateAt: new Date().toISOString(), // ✅ FIXED: updateAt
     };
 
-    const { data: updatedArticle, error } = await supabase
-      .from('Article')
-      .update(articleData)
-      .eq('id', id)
-      .select(
-        `
-        *,
-        user:User(id, name, email, role, group, nim, avatar_url)
-      `,
-      )
-      .single();
+    const { data: updatedArticle, error } = await supabase.from('Article').update(articleData).eq('id', id).select('*').single();
 
     if (error) {
       console.error('Error updating article:', error);
@@ -218,16 +210,7 @@ export async function GET_BY_ID(request: NextRequest, { params }: { params: { id
   try {
     const { id } = params;
 
-    const { data: article, error } = await supabase
-      .from('Article')
-      .select(
-        `
-        *,
-        user:User(id, name, email, role, group, nim, avatar_url)
-      `,
-      )
-      .eq('id', id)
-      .single();
+    const { data: article, error } = await supabase.from('Article').select('*').eq('id', id).single();
 
     if (error || !article) {
       return NextResponse.json({ error: 'Artikel tidak ditemukan' }, { status: 404 });

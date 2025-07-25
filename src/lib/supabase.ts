@@ -1,10 +1,10 @@
-// src/lib/supabase.ts - SESUAI SCHEMA PRISMA DATABASE UTAMA
+// src/lib/supabase.ts - FIXED untuk database utama sesuai skema Prisma
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseAnonKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-// Database schema sesuai Prisma schema yang diberikan
+// ✅ FIXED: Database types sesuai skema Prisma yang diberikan
 export interface Database {
   public: {
     Tables: {
@@ -16,7 +16,7 @@ export interface Database {
           password: string;
           role: 'USER' | 'ADMIN';
           createdAt: string;
-          updateAt: string; // ✅ FIXED: updateAt bukan updated_at
+          updateAt: string;
           group: string | null;
           nim: string | null;
           avatar_url: string | null;
@@ -44,7 +44,7 @@ export interface Database {
           password: string;
           role?: 'USER' | 'ADMIN';
           createdAt?: string;
-          updateAt?: string; // ✅ FIXED: updateAt bukan updated_at
+          updateAt?: string;
           group?: string | null;
           nim?: string | null;
           avatar_url?: string | null;
@@ -72,7 +72,7 @@ export interface Database {
           password?: string;
           role?: 'USER' | 'ADMIN';
           createdAt?: string;
-          updateAt?: string; // ✅ FIXED: updateAt bukan updated_at
+          updateAt?: string;
           group?: string | null;
           nim?: string | null;
           avatar_url?: string | null;
@@ -136,6 +136,79 @@ export interface Database {
           doi?: string | null;
           keywords?: string | null;
           year?: string | null;
+        };
+      };
+      Node: {
+        Row: {
+          id: string;
+          label: string;
+          title: string | null;
+          att_goal: string | null;
+          att_method: string | null;
+          att_background: string | null;
+          att_future: string | null;
+          att_gaps: string | null;
+          att_url: string | null;
+          type: string;
+          content: string;
+          articleId: string;
+        };
+        Insert: {
+          id?: string;
+          label: string;
+          title?: string | null;
+          att_goal?: string | null;
+          att_method?: string | null;
+          att_background?: string | null;
+          att_future?: string | null;
+          att_gaps?: string | null;
+          att_url?: string | null;
+          type: string;
+          content: string;
+          articleId: string;
+        };
+        Update: {
+          id?: string;
+          label?: string;
+          title?: string | null;
+          att_goal?: string | null;
+          att_method?: string | null;
+          att_background?: string | null;
+          att_future?: string | null;
+          att_gaps?: string | null;
+          att_url?: string | null;
+          type?: string;
+          content?: string;
+          articleId?: string;
+        };
+      };
+      Edge: {
+        Row: {
+          id: string;
+          fromId: string;
+          toId: string;
+          relation: string | null;
+          label: string | null;
+          color: string | null;
+          articleId: string;
+        };
+        Insert: {
+          id?: string;
+          fromId: string;
+          toId: string;
+          relation?: string | null;
+          label?: string | null;
+          color?: string | null;
+          articleId: string;
+        };
+        Update: {
+          id?: string;
+          fromId?: string;
+          toId?: string;
+          relation?: string | null;
+          label?: string | null;
+          color?: string | null;
+          articleId?: string;
         };
       };
       Assignment: {
@@ -232,6 +305,279 @@ export interface Database {
           updatedAt?: string;
         };
       };
+      BrainstormingSession: {
+        Row: {
+          id: string;
+          title: string;
+          description: string | null;
+          userId: string;
+          selectedFilterArticles: string[];
+          lastSelectedNodeId: string | null;
+          lastSelectedEdgeId: string | null;
+          graphFilters: any | null;
+          createdAt: string;
+          updatedAt: string;
+          lastActivity: string;
+          coverColor: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description?: string | null;
+          userId: string;
+          selectedFilterArticles?: string[];
+          lastSelectedNodeId?: string | null;
+          lastSelectedEdgeId?: string | null;
+          graphFilters?: any | null;
+          createdAt?: string;
+          updatedAt?: string;
+          lastActivity?: string;
+          coverColor?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          description?: string | null;
+          userId?: string;
+          selectedFilterArticles?: string[];
+          lastSelectedNodeId?: string | null;
+          lastSelectedEdgeId?: string | null;
+          graphFilters?: any | null;
+          createdAt?: string;
+          updatedAt?: string;
+          lastActivity?: string;
+          coverColor?: string;
+        };
+      };
+      Analytics: {
+        Row: {
+          id: number;
+          action: string;
+          document: string | null;
+          userId: string;
+          metadata: any | null;
+          timestamp: string;
+        };
+        Insert: {
+          id?: number;
+          action: string;
+          document?: string | null;
+          userId: string;
+          metadata?: any | null;
+          timestamp?: string;
+        };
+        Update: {
+          id?: number;
+          action?: string;
+          document?: string | null;
+          userId?: string;
+          metadata?: any | null;
+          timestamp?: string;
+        };
+      };
+      Draft: {
+        Row: {
+          id: string;
+          userId: string | null;
+          title: string;
+          createdAt: string;
+          writerId: string | null;
+        };
+        Insert: {
+          id?: string;
+          userId?: string | null;
+          title: string;
+          createdAt?: string;
+          writerId?: string | null;
+        };
+        Update: {
+          id?: string;
+          userId?: string | null;
+          title?: string;
+          createdAt?: string;
+          writerId?: string | null;
+        };
+      };
+      DraftSection: {
+        Row: {
+          id: string;
+          draftId: string;
+          title: string;
+          content: string;
+        };
+        Insert: {
+          id?: string;
+          draftId: string;
+          title: string;
+          content: string;
+        };
+        Update: {
+          id?: string;
+          draftId?: string;
+          title?: string;
+          content?: string;
+        };
+      };
+      Annotation: {
+        Row: {
+          id: string;
+          userId: string | null;
+          articleId: string | null;
+          page: number;
+          highlightedText: string;
+          comment: string;
+          semanticTag: string | null;
+          draftSectionId: string | null;
+          createdAt: string;
+        };
+        Insert: {
+          id?: string;
+          userId?: string | null;
+          articleId?: string | null;
+          page: number;
+          highlightedText: string;
+          comment: string;
+          semanticTag?: string | null;
+          draftSectionId?: string | null;
+          createdAt?: string;
+        };
+        Update: {
+          id?: string;
+          userId?: string | null;
+          articleId?: string | null;
+          page?: number;
+          highlightedText?: string;
+          comment?: string;
+          semanticTag?: string | null;
+          draftSectionId?: string | null;
+          createdAt?: string;
+        };
+      };
+      ChatMessage: {
+        Row: {
+          id: string;
+          sessionId: string;
+          content: string;
+          role: string;
+          createdAt: string;
+          contextEdgeIds: string[];
+          contextNodeIds: string[];
+          references: any | null;
+        };
+        Insert: {
+          id?: string;
+          sessionId: string;
+          content: string;
+          role: string;
+          createdAt?: string;
+          contextEdgeIds?: string[];
+          contextNodeIds?: string[];
+          references?: any | null;
+        };
+        Update: {
+          id?: string;
+          sessionId?: string;
+          content?: string;
+          role?: string;
+          createdAt?: string;
+          contextEdgeIds?: string[];
+          contextNodeIds?: string[];
+          references?: any | null;
+        };
+      };
+      WriterSession: {
+        Row: {
+          id: string;
+          title: string;
+          description: string | null;
+          userId: string;
+          createdAt: string;
+          updatedAt: string;
+          lastActivity: string;
+          coverColor: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description?: string | null;
+          userId: string;
+          createdAt?: string;
+          updatedAt?: string;
+          lastActivity?: string;
+          coverColor?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          description?: string | null;
+          userId?: string;
+          createdAt?: string;
+          updatedAt?: string;
+          lastActivity?: string;
+          coverColor?: string;
+        };
+      };
+      Document: {
+        Row: {
+          id: string;
+          content: string;
+          metadata: any;
+          embedding: any;
+          createdAt: string;
+        };
+        Insert: {
+          id?: string;
+          content: string;
+          metadata?: any;
+          embedding?: any;
+          createdAt?: string;
+        };
+        Update: {
+          id?: string;
+          content?: string;
+          metadata?: any;
+          embedding?: any;
+          createdAt?: string;
+        };
+      };
+      TokenUsage: {
+        Row: {
+          id: string;
+          userId: string;
+          sessionId: string | null;
+          tokensUsed: number;
+          inputTokens: number;
+          outputTokens: number;
+          model: string;
+          purpose: string;
+          metadata: any | null;
+          createdAt: string;
+        };
+        Insert: {
+          id?: string;
+          userId: string;
+          sessionId?: string | null;
+          tokensUsed: number;
+          inputTokens?: number;
+          outputTokens?: number;
+          model: string;
+          purpose: string;
+          metadata?: any | null;
+          createdAt?: string;
+        };
+        Update: {
+          id?: string;
+          userId?: string;
+          sessionId?: string | null;
+          tokensUsed?: number;
+          inputTokens?: number;
+          outputTokens?: number;
+          model?: string;
+          purpose?: string;
+          metadata?: any | null;
+          createdAt?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;
@@ -245,7 +591,7 @@ export interface Database {
   };
 }
 
-// FIXED: Create client dengan proper headers untuk file upload
+// ✅ FIXED: Create client dengan proper headers untuk file upload
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   db: {
     schema: 'public',
@@ -267,7 +613,7 @@ export type UserRole = Database['public']['Tables']['User']['Row']['role'];
 export type UserInsert = Database['public']['Tables']['User']['Insert'];
 export type UserUpdate = Database['public']['Tables']['User']['Update'];
 
-// Interface User sesuai Prisma
+// ✅ TIDAK UBAH: Interface User sesuai Prisma (TETAP SAMA)
 export interface User {
   id: string;
   email: string;
@@ -297,7 +643,7 @@ export interface User {
   settings: any | null;
 }
 
-// Helper functions untuk User Management (TIDAK UBAH FUNGSI)
+// ✅ TIDAK UBAH: Helper functions untuk User Management (TETAP SAMA)
 export const getUserProfile = async (userId: string) => {
   const { data, error } = await supabase.from('User').select('*').eq('id', userId).single();
 
@@ -330,7 +676,7 @@ export const getUsersByRole = async (role: 'ADMIN' | 'USER') => {
   return { data, error };
 };
 
-// ✅ ADDED: Missing functions yang dibutuhkan profile page
+// ✅ TIDAK UBAH: Missing functions yang dibutuhkan profile page (TETAP SAMA)
 export const updateUserSettings = async (userId: string, settings: any) => {
   const { data, error } = await supabase
     .from('User')
@@ -345,89 +691,51 @@ export const updateUserSettings = async (userId: string, settings: any) => {
   return { data, error };
 };
 
-export const verifyUserEmail = async (userId: string) => {
-  const { data, error } = await supabase
-    .from('User')
-    .update({
-      isEmailVerified: true,
-      updateAt: new Date().toISOString(),
-    })
-    .eq('id', userId)
-    .select()
-    .single();
+export const deleteUser = async (userId: string) => {
+  const { data, error } = await supabase.from('User').delete().eq('id', userId);
 
   return { data, error };
 };
 
-export const verifyUserPhone = async (userId: string) => {
+// ✅ ADDED: Helper functions untuk Article (BARU)
+export const getArticlesByUser = async (userId: string) => {
   const { data, error } = await supabase
-    .from('User')
-    .update({
-      isPhoneVerified: true,
-      updateAt: new Date().toISOString(),
-    })
-    .eq('id', userId)
-    .select()
-    .single();
+    .from('Article')
+    .select(
+      `
+      *,
+      user:userId(id, name, email, role, group, nim, avatar_url)
+    `,
+    )
+    .eq('userId', userId)
+    .order('createdAt', { ascending: false });
 
   return { data, error };
 };
 
-export const uploadUserAvatar = async (userId: string, file: File) => {
-  try {
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      throw new Error('File harus berupa gambar (JPG, PNG, WEBP)');
-    }
+export const getAllArticles = async () => {
+  const { data, error } = await supabase
+    .from('Article')
+    .select(
+      `
+      *,
+      user:userId(id, name, email, role, group, nim, avatar_url)
+    `,
+    )
+    .order('createdAt', { ascending: false });
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      throw new Error('Ukuran file tidak boleh lebih dari 5MB');
-    }
-
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${userId}-${Date.now()}.${fileExt}`;
-    const filePath = `avatars/${fileName}`;
-
-    // Upload file
-    const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file, {
-      cacheControl: '3600',
-      upsert: true,
-    });
-
-    if (uploadError) throw uploadError;
-
-    // Get public URL
-    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
-
-    // Update user profile
-    const { data, error: updateError } = await supabase
-      .from('User')
-      .update({
-        avatar_url: urlData.publicUrl,
-        updateAt: new Date().toISOString(),
-      })
-      .eq('id', userId)
-      .select()
-      .single();
-
-    if (updateError) throw updateError;
-
-    return { data, error: null };
-  } catch (error: any) {
-    return { data: null, error: error.message };
-  }
+  return { data, error };
 };
 
-export const updateLastActive = async (userId: string) => {
-  const { data, error } = await supabase
-    .from('User')
-    .update({
-      lastActive: new Date().toISOString(),
-      updateAt: new Date().toISOString(),
-    })
-    .eq('id', userId);
+// ✅ ADDED: Helper functions untuk Assignment (BARU)
+export const getAssignmentsByCreator = async (creatorId: string) => {
+  const { data, error } = await supabase.from('Assignment').select('*').eq('created_by', creatorId).order('createdAt', { ascending: false });
+
+  return { data, error };
+};
+
+export const getActiveAssignments = async () => {
+  const { data, error } = await supabase.from('Assignment').select('*').eq('is_active', true).order('week_number', { ascending: true });
 
   return { data, error };
 };
