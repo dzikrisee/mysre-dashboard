@@ -2,6 +2,7 @@
 // FINAL FIXED - Relations & Submission System
 
 import { supabase } from '@/lib/supabase';
+import { v4 as uuidv4 } from 'uuid'; // TAMBAHKAN INI
 
 export class AssignmentService {
   // ==================== ADMIN METHODS ====================
@@ -25,6 +26,7 @@ export class AssignmentService {
       const { data: assignment, error } = await supabase
         .from('Assignment')
         .insert({
+          id: uuidv4(), // TAMBAHKAN INI
           title: data.title,
           description: data.description,
           week_number: data.week_number,
@@ -36,7 +38,7 @@ export class AssignmentService {
           target_classes: data.target_classes,
           created_by: data.created_by,
           createdAt: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          updatedAt: new Date().toISOString(), // GANTI DARI updated_at
         })
         .select(
           `
@@ -236,6 +238,7 @@ export class AssignmentService {
       const { data: submission, error } = await supabase
         .from('AssignmentSubmission')
         .insert({
+          id: uuidv4(), // TAMBAHKAN INI
           assignment_id: data.assignment_id,
           student_id: data.student_id,
           assignment_code_input: data.assignment_code_input,
@@ -244,8 +247,8 @@ export class AssignmentService {
           submission_text: data.submission_text || null,
           status: 'submitted',
           submitted_at: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          createdAt: new Date().toISOString(), // GANTI DARI created_at
+          updatedAt: new Date().toISOString(), // GANTI DARI updated_at
         })
         .select(
           `
@@ -309,7 +312,7 @@ export class AssignmentService {
     try {
       const updateData = {
         ...data,
-        updated_at: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
       const { data: submission, error } = await supabase
@@ -429,7 +432,7 @@ export class AssignmentService {
           grade,
           feedback,
           graded_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         })
         .eq('id', id)
         .select(

@@ -1,5 +1,5 @@
 // src/components/assignment/assignment-form.tsx
-// Update untuk mendukung eksperimen kelas sesuai permintaan Pak Rio
+// Complete fixed version with proper target_classes handling
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -10,8 +10,7 @@ import { notifications } from '@mantine/notifications';
 import { IconFile, IconCalendar, IconCheck, IconAlertCircle, IconUsers, IconRefresh, IconInfoCircle } from '@tabler/icons-react';
 import { uploadFile } from '@/lib/services/storage.service';
 import { AssignmentService } from '@/lib/services/assignment.service';
-import { useAuth } from '@/providers/auth-provider'; // DIRECT IMPORT DARI PROVIDER
-import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/providers/auth-provider';
 import type { Assignment } from '@/lib/types/assignment';
 
 interface AssignmentFormProps {
@@ -29,14 +28,13 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
 
   const form = useForm({
     initialValues: {
-      title: assignment?.title || '',
-      description: assignment?.description || '',
-      week_number: assignment?.week_number || 1,
-      assignment_code: assignment?.assignment_code || '',
-      due_date: assignment?.due_date ? new Date(assignment.due_date) : null,
-      is_active: assignment?.is_active ?? true,
-      // UPDATE: Default target_classes sesuai eksperimen kelas
-      target_classes: assignment?.target_classes || [], // Kosong untuk manual selection
+      title: '',
+      description: '',
+      week_number: 1,
+      assignment_code: '',
+      due_date: null as Date | null,
+      is_active: true,
+      target_classes: [] as string[],
     },
     validate: {
       title: (value) => (!value ? 'Judul harus diisi' : null),
@@ -48,11 +46,43 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
         if (!/^[A-Z0-9]+$/.test(value)) return 'Code hanya boleh huruf besar dan angka';
         return null;
       },
-      // UPDATE: Validasi target kelas untuk eksperimen
       target_classes: (value) => (!value || value.length === 0 ? 'Pilih minimal satu kelas target' : null),
     },
   });
 
+  // FIXED: Populate form when editing assignment
+  useEffect(() => {
+    if (assignment) {
+      // Parse target_classes dari berbagai format
+      let targetClassesArray: string[] = [];
+
+      if (assignment.target_classes) {
+        if (Array.isArray(assignment.target_classes)) {
+          targetClassesArray = assignment.target_classes;
+        } else if (typeof assignment.target_classes === 'string') {
+          // Handle PostgreSQL array format: "{A,B}" atau "A,B"
+          const targetString = assignment.target_classes as string;
+          targetClassesArray = targetString
+            .replace(/[{}]/g, '') // Remove brackets
+            .split(',')
+            .map((s: string) => s.trim())
+            .filter((s: string) => s);
+        }
+      }
+
+      form.setValues({
+        title: assignment.title || '',
+        description: assignment.description || '',
+        week_number: assignment.week_number || 1,
+        assignment_code: assignment.assignment_code || '',
+        due_date: assignment.due_date ? new Date(assignment.due_date) : null,
+        is_active: assignment.is_active ?? true,
+        target_classes: targetClassesArray,
+      });
+    }
+  }, [assignment]);
+
+  // Check assignment code availability
   useEffect(() => {
     const checkCode = async () => {
       if (form.values.assignment_code.length >= 3) {
@@ -61,14 +91,13 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
           setCodeError(exists ? 'Code sudah digunakan' : null);
         } catch (error) {
           console.error('Error checking code:', error);
-          setCodeError(null); // Reset error on API failure
+          setCodeError(null);
         }
       } else {
         setCodeError(null);
       }
     };
 
-    // OPTIMIZED: Reduced debounce dari 500ms ke 300ms
     const debounce = setTimeout(checkCode, 300);
     return () => clearTimeout(debounce);
   }, [form.values.assignment_code, assignment?.id]);
@@ -94,12 +123,10 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
     }
   };
 
-  // UPDATE: Handler untuk target kelas eksperimen
   const handleTargetClassesChange = (classes: string[]) => {
     form.setFieldValue('target_classes', classes);
   };
 
-  // SIMPLIFIED handleSubmit - hapus semua yang tidak perlu
   const handleSubmit = async (values: typeof form.values) => {
     if (codeError) {
       notifications.show({
@@ -136,7 +163,6 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
         setUploadingFile(false);
       }
 
-      // FIXED: Proper date handling dan null conversion
       const assignmentData = {
         title: values.title,
         description: values.description,
@@ -144,7 +170,7 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
         assignment_code: values.assignment_code,
         file_url: fileUrl || undefined,
         file_name: fileName || undefined,
-        due_date: values.due_date && values.due_date instanceof Date ? values.due_date.toISOString() : undefined, // Safe date handling
+        due_date: values.due_date && values.due_date instanceof Date ? values.due_date.toISOString() : undefined,
         is_active: values.is_active,
         target_classes: values.target_classes,
         created_by: user.id,
@@ -216,7 +242,7 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
             </div>
           </Group>
 
-          {/* UPDATE: Target Classes untuk Eksperimen Kelas */}
+          {/* Target Classes untuk Eksperimen */}
           <div>
             <Group mb={8}>
               <IconUsers size={16} />
@@ -238,8 +264,8 @@ export function AssignmentForm({ assignment, onSuccess, onCancel }: AssignmentFo
               </Stack>
             </Checkbox.Group>
 
-            {/* Preview target kelas yang dipilih */}
-            {form.values.target_classes.length > 0 && (
+            {/* Preview target kelas yang dipilih - FIXED */}
+            {Array.isArray(form.values.target_classes) && form.values.target_classes.length > 0 && (
               <Alert icon={<IconAlertCircle size={16} />} color="green" variant="light" mt="xs">
                 <Group gap="xs">
                   <Text size="sm" fw={500}>

@@ -202,17 +202,59 @@ export function AssignmentList({ assignments, loading, onEdit, onDelete, onRefre
     return matchesSearch && matchesStatus && matchesWeek && matchesClass;
   });
 
+
   // Helper functions
-  const getTargetClassesDisplay = (classes: string[]) => {
-    if (!classes || classes.length === 0) return 'Semua Kelas';
-    if (classes.length === 2) return 'Kelas A & B';
-    return `Kelas ${classes.join(', ')}`;
+  const getTargetClassesDisplay = (classes: any) => {
+    // Handle berbagai format classes dari database
+    let classArray: string[] = [];
+
+    if (!classes) {
+      return 'Semua Kelas';
+    }
+
+    // Jika sudah array
+    if (Array.isArray(classes)) {
+      classArray = classes;
+    }
+    // Jika string PostgreSQL array format: "{A,B}" atau "A,B"
+    else if (typeof classes === 'string') {
+      // Remove brackets dan split by comma
+      classArray = classes
+        .replace(/[{}]/g, '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s);
+    }
+    // Jika object atau format lain
+    else {
+      console.warn('Unexpected target_classes format:', classes);
+      return 'Format tidak valid';
+    }
+
+    if (classArray.length === 0) return 'Semua Kelas';
+    if (classArray.length === 2) return 'Kelas A & B';
+    return `Kelas ${classArray.join(', ')}`;
   };
 
-  const getTargetClassesColor = (classes: string[]) => {
-    if (!classes || classes.length === 0) return 'gray';
-    if (classes.length === 2) return 'blue';
-    return classes[0] === 'A' ? 'green' : 'orange';
+  const getTargetClassesColor = (classes: any) => {
+    // Handle berbagai format classes dari database
+    let classArray: string[] = [];
+
+    if (!classes) return 'gray';
+
+    if (Array.isArray(classes)) {
+      classArray = classes;
+    } else if (typeof classes === 'string') {
+      classArray = classes
+        .replace(/[{}]/g, '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s);
+    }
+
+    if (classArray.length === 0) return 'gray';
+    if (classArray.length === 2) return 'blue';
+    return classArray[0] === 'A' ? 'green' : 'orange';
   };
 
   return (
