@@ -1,4 +1,4 @@
-// src/app/api/articles/route.ts - FIXED FOR PRISMA SCHEMA
+// src/app/api/articles/route.ts - FIXED FOR PRISMA SCHEMA & UPLOADS BUCKET
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
@@ -186,10 +186,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: deleteError.message }, { status: 500 });
     }
 
-    // Try to delete the file from storage (optional, don't fail if it doesn't exist)
+    // ✅ FIXED: Try to delete the file from uploads bucket (optional, don't fail if it doesn't exist)
     if (existingArticle.filePath) {
       try {
-        await supabase.storage.from('documents').remove([existingArticle.filePath]);
+        await supabase.storage.from('uploads').remove([existingArticle.filePath]);
       } catch (storageError) {
         console.warn('Could not delete file from storage:', storageError);
         // Don't fail the request if storage deletion fails
@@ -210,7 +210,27 @@ export async function GET_BY_ID(request: NextRequest, { params }: { params: { id
   try {
     const { id } = params;
 
-    const { data: article, error } = await supabase.from('Article').select('*').eq('id', id).single();
+    const { data: article, error } = await supabase
+      .from('Article')
+      .select(
+        `
+        id,
+        title,
+        filePath,
+        createdAt,
+        updateAt,
+        userId,
+        sessionId,
+        abstract,
+        author,
+        doi,
+        keywords,
+        year,
+        user:userId(id, name, email, role, group, nim, avatar_url)
+      `,
+      )
+      .eq('id', id)
+      .single();
 
     if (error || !article) {
       return NextResponse.json({ error: 'Artikel tidak ditemukan' }, { status: 404 });

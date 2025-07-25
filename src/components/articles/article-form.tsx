@@ -1,4 +1,4 @@
-// src/components/articles/article-form.tsx - UPDATED FOR PRISMA SCHEMA
+// src/components/articles/article-form.tsx - FIXED VERSION
 'use client';
 
 import { useState } from 'react';
@@ -6,8 +6,23 @@ import { Modal, TextInput, Textarea, Button, Stack, Group, FileInput, Text, Prog
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX, IconUpload } from '@tabler/icons-react';
-import { supabase, Article } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
+
+// Article Interface sesuai Prisma Schema
+interface Article {
+  id: string;
+  title: string;
+  filePath: string;
+  createdAt: string;
+  updateAt?: string;
+  userId?: string;
+  abstract?: string;
+  author?: string;
+  doi?: string;
+  keywords?: string;
+  year?: string;
+}
 
 interface ArticleFormProps {
   article?: Article | null;
@@ -64,31 +79,31 @@ export function ArticleForm({ article, onClose, onSuccess }: ArticleFormProps) {
     },
   });
 
+  // ✅ FIXED: Upload file ke bucket 'uploads'
   const uploadFileToStorage = async (file: File): Promise<string> => {
     try {
       const timestamp = Date.now();
       const randomStr = Math.random().toString(36).substring(7);
       const fileExt = file.name.split('.').pop();
-      const fileName = `${timestamp}-${randomStr}.${fileExt}`;
-      const filePath = `articles/${fileName}`;
+      const fileName = `document-${timestamp}-${randomStr}.${fileExt}`;
 
-      // Simulate upload progress
-      setUploadProgress(25);
+      setUploadProgress(10);
 
-      const { error: uploadError } = await supabase.storage.from('documents').upload(filePath, file);
+      // ✅ FIXED: Upload ke bucket 'uploads'
+      const { data, error } = await supabase.storage.from('uploads').upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
 
-      if (uploadError) {
-        throw new Error(`Upload failed: ${uploadError.message}`);
+      setUploadProgress(90);
+
+      if (error) {
+        throw new Error(`Upload error: ${error.message}`);
       }
 
       setUploadProgress(100);
-
-      // Small delay to show progress
-      setTimeout(() => setUploadProgress(0), 1000);
-
-      return filePath;
-    } catch (error) {
-      console.error('Error uploading file:', error);
+      return fileName; // ✅ Return hanya filename, bukan full path
+    } catch (error: any) {
       setUploadProgress(0);
       throw error;
     }
@@ -99,63 +114,46 @@ export function ArticleForm({ article, onClose, onSuccess }: ArticleFormProps) {
     setUploadProgress(0);
 
     try {
-      let filePath = article?.filePath;
+      let filePath = article?.filePath || '';
 
-      // Upload file jika ada file baru
+      // Upload new file if provided
       if (values.file) {
         filePath = await uploadFileToStorage(values.file);
       }
 
-      // ✅ UPDATED: Prepare data sesuai Prisma schema
-      const articleData: any = {
+      const articleData = {
         title: values.title,
-        filePath: filePath!,
+        filePath,
+        userId: user?.id || null,
         abstract: values.abstract || null,
         author: values.author || null,
         doi: values.doi || null,
         keywords: values.keywords || null,
         year: values.year || null,
-        updateAt: new Date().toISOString(), // ✅ FIXED: updateAt sesuai Prisma
-        userId: user?.id || null,
       };
 
-      let result;
-      if (isEditing) {
-        // Update existing article
-        result = await supabase
-          .from('Article')
-          .update(articleData)
-          .eq('id', article!.id)
-          .select(
-            `
-            *,
-            user:User(id, name, email, role, group, nim, avatar_url)
-          `,
-          )
-          .single();
-      } else {
-        // Create new article
-        articleData.createdAt = new Date().toISOString(); // ✅ FIXED: createdAt
+      const url = '/api/articles';
+      const method = isEditing ? 'PUT' : 'POST';
+      const body = isEditing ? { id: article?.id, ...articleData } : articleData;
 
-        result = await supabase
-          .from('Article')
-          .insert(articleData)
-          .select(
-            `
-            *,
-            user:User(id, name, email, role, group, nim, avatar_url)
-          `,
-          )
-          .single();
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Gagal menyimpan artikel');
       }
 
-      if (result.error) {
-        throw new Error(result.error.message);
-      }
+      const result = await response.json();
 
       notifications.show({
         title: 'Berhasil!',
-        message: `Artikel berhasil ${isEditing ? 'diperbarui' : 'ditambahkan'}`,
+        message: isEditing ? 'Artikel berhasil diperbarui' : 'Artikel berhasil dibuat',
         color: 'green',
         icon: <IconCheck size={16} />,
       });
@@ -165,7 +163,7 @@ export function ArticleForm({ article, onClose, onSuccess }: ArticleFormProps) {
     } catch (error: any) {
       console.error('Error saving article:', error);
       notifications.show({
-        title: 'Error!',
+        title: 'Error',
         message: error.message || 'Terjadi kesalahan saat menyimpan artikel',
         color: 'red',
         icon: <IconX size={16} />,
@@ -177,54 +175,41 @@ export function ArticleForm({ article, onClose, onSuccess }: ArticleFormProps) {
   };
 
   return (
-    <Modal opened={true} onClose={onClose} title={`${isEditing ? 'Edit' : 'Tambah'} Artikel`} size="lg" centered>
-      <form onSubmit={form.onSubmit(handleSubmit)}>
-        <Stack gap="md">
-          {/* Basic Info */}
-          <TextInput label="Judul Artikel" placeholder="Masukkan judul artikel" required {...form.getInputProps('title')} />
+    <form onSubmit={form.onSubmit(handleSubmit)}>
+      <Stack gap="md">
+        <TextInput label="Judul Artikel" placeholder="Masukkan judul artikel" required {...form.getInputProps('title')} />
 
-          <Textarea label="Abstrak" placeholder="Ringkasan atau abstrak artikel (opsional)" minRows={3} maxRows={6} {...form.getInputProps('abstract')} />
+        <Textarea label="Abstract" placeholder="Ringkasan atau abstrak artikel (opsional)" rows={4} {...form.getInputProps('abstract')} />
 
-          {/* Author Info */}
-          <Group grow>
-            <TextInput label="Penulis" placeholder="Nama penulis artikel" {...form.getInputProps('author')} />
-            <TextInput label="Tahun Publikasi" placeholder="2024" {...form.getInputProps('year')} />
-          </Group>
+        <Group grow>
+          <TextInput label="Penulis" placeholder="Nama penulis artikel" {...form.getInputProps('author')} />
+          <TextInput label="Tahun Publikasi" placeholder="2024" {...form.getInputProps('year')} />
+        </Group>
 
-          {/* Academic Info */}
-          <Group grow>
-            <TextInput label="DOI" placeholder="10.1000/182 (opsional)" {...form.getInputProps('doi')} />
-            <TextInput label="Kata Kunci" placeholder="machine learning, AI, data science" {...form.getInputProps('keywords')} />
-          </Group>
+        <TextInput label="DOI" placeholder="10.xxxx/xxxx (opsional)" {...form.getInputProps('doi')} />
 
-          {/* File Upload */}
-          <FileInput label="File Dokumen" placeholder="Pilih file PDF, DOC, atau DOCX" accept=".pdf,.doc,.docx,.txt" leftSection={<IconUpload size={16} />} required={!isEditing} {...form.getInputProps('file')} />
+        <TextInput label="Keywords" placeholder="kata kunci, dipisah, dengan, koma" {...form.getInputProps('keywords')} />
 
-          {/* Upload Progress */}
-          {uploadProgress > 0 && uploadProgress < 100 && <Progress value={uploadProgress} size="sm" animated />}
+        <FileInput label={isEditing ? 'File Baru (Opsional)' : 'File PDF Artikel'} placeholder="Pilih file PDF" accept="application/pdf" required={!isEditing} leftSection={<IconUpload size={16} />} {...form.getInputProps('file')} />
 
-          <Text size="xs" c="dimmed">
-            <strong>Format yang didukung:</strong> PDF, DOC, DOCX, TXT (Maksimal 10MB)
-          </Text>
-
-          {/* File Info */}
-          {isEditing && article?.filePath && (
-            <Text size="sm" c="blue">
-              📄 File saat ini: {article.filePath.split('/').pop()}
+        {uploadProgress > 0 && uploadProgress < 100 && (
+          <div>
+            <Text size="sm" mb="xs">
+              Uploading file... {uploadProgress}%
             </Text>
-          )}
+            <Progress value={uploadProgress} color="blue" />
+          </div>
+        )}
 
-          {/* Actions */}
-          <Group justify="flex-end" mt="lg">
-            <Button variant="light" onClick={onClose} disabled={loading}>
-              Batal
-            </Button>
-            <Button type="submit" loading={loading} leftSection={<IconCheck size={16} />}>
-              {isEditing ? 'Simpan Perubahan' : 'Tambah Artikel'}
-            </Button>
-          </Group>
-        </Stack>
-      </form>
-    </Modal>
+        <Group justify="flex-end" mt="md">
+          <Button variant="subtle" onClick={onClose} disabled={loading}>
+            Batal
+          </Button>
+          <Button type="submit" loading={loading} leftSection={<IconCheck size={16} />}>
+            {isEditing ? 'Simpan Perubahan' : 'Buat Artikel'}
+          </Button>
+        </Group>
+      </Stack>
+    </form>
   );
 }
