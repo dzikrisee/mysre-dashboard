@@ -1,8 +1,9 @@
 // src/app/dashboard/project-writer/page.tsx
+// Updated to use real WriterSession data from database
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Stack, Title, Text, Card, Group, Button, Badge, Grid, SimpleGrid, ActionIcon, Modal, TextInput, Textarea, Select, Table, Avatar, Menu, Tooltip, Progress, ThemeIcon, Center, Loader, Paper, Alert } from '@mantine/core';
+import { Stack, Title, Text, Card, Group, Button, Badge, Grid, SimpleGrid, ActionIcon, Modal, TextInput, Textarea, Select, Table, Avatar, Menu, Tooltip, Progress, ThemeIcon, Center, Loader, Paper, Alert, ScrollArea, Box } from '@mantine/core';
 import {
   IconPlus,
   IconEdit,
@@ -23,146 +24,64 @@ import {
   IconPencil,
   IconBookmark,
   IconTarget,
+  IconDots,
 } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { useAuth } from '@/providers/auth-provider';
 import { notifications } from '@mantine/notifications';
-
-// Types
-interface Project {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  status: 'draft' | 'in-progress' | 'review' | 'completed';
-  priority: 'low' | 'medium' | 'high';
-  createdAt: string;
-  updatedAt: string;
-  authorId: string;
-  author: {
-    name: string;
-    email: string;
-    avatar_url?: string;
-  };
-  wordCount: number;
-  targetWords: number;
-  deadline?: string;
-}
+import { WriterSessionService, type WriterSession } from '@/lib/services/writer-session.service';
 
 interface ProjectStats {
-  totalProjects: number;
-  draftProjects: number;
-  inProgressProjects: number;
-  completedProjects: number;
-  totalWords: number;
-  averageProgress: number;
+  totalSessions: number;
+  recentSessions: number;
+  activeSessions: number;
+  userSessions: number;
 }
 
 export default function ProjectWriterPage() {
   const { user } = useAuth();
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [sessions, setSessions] = useState<WriterSession[]>([]);
   const [stats, setStats] = useState<ProjectStats>({
-    totalProjects: 0,
-    draftProjects: 0,
-    inProgressProjects: 0,
-    completedProjects: 0,
-    totalWords: 0,
-    averageProgress: 0,
+    totalSessions: 0,
+    recentSessions: 0,
+    activeSessions: 0,
+    userSessions: 0,
   });
   const [loading, setLoading] = useState(true);
   const [opened, { open, close }] = useDisclosure(false);
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [editingSession, setEditingSession] = useState<WriterSession | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'title' | 'createdAt' | 'status' | 'priority'>('createdAt');
+  const [sortBy, setSortBy] = useState<'title' | 'createdAt' | 'lastActivity'>('lastActivity');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    category: '',
-    priority: 'medium' as 'low' | 'medium' | 'high',
-    targetWords: 1000,
-    deadline: '',
+    coverColor: '#4c6ef5',
   });
 
-  // Simulate data loading
   useEffect(() => {
-    loadProjects();
+    loadWriterSessions();
+    loadStats();
   }, []);
 
-  const loadProjects = async () => {
+  const loadWriterSessions = async () => {
     setLoading(true);
     try {
-      // Simulate API call - replace with actual Supabase call
-      const mockProjects: Project[] = [
-        {
-          id: '1',
-          title: 'Analisis Pengaruh Social Media terhadap Pembelajaran',
-          description: 'Penelitian tentang dampak penggunaan social media dalam konteks pembelajaran mahasiswa',
-          category: 'Penelitian',
-          status: 'in-progress',
-          priority: 'high',
-          createdAt: '2024-01-15T10:00:00Z',
-          updatedAt: '2024-01-20T14:30:00Z',
-          authorId: user?.id || '1',
-          author: {
-            name: user?.name || 'John Doe',
-            email: user?.email || 'john@example.com',
-            avatar_url: user?.avatar_url,
-          },
-          wordCount: 2500,
-          targetWords: 5000,
-          deadline: '2024-03-15',
-        },
-        {
-          id: '2',
-          title: 'Implementasi AI dalam Pendidikan Tinggi',
-          description: 'Studi kasus implementasi artificial intelligence dalam sistem pendidikan tinggi di Indonesia',
-          category: 'Studi Kasus',
-          status: 'draft',
-          priority: 'medium',
-          createdAt: '2024-01-10T09:00:00Z',
-          updatedAt: '2024-01-10T09:00:00Z',
-          authorId: user?.id || '1',
-          author: {
-            name: user?.name || 'John Doe',
-            email: user?.email || 'john@example.com',
-            avatar_url: user?.avatar_url,
-          },
-          wordCount: 0,
-          targetWords: 8000,
-          deadline: '2024-04-20',
-        },
-        {
-          id: '3',
-          title: 'Evaluasi Sistem Pembelajaran Online',
-          description: 'Analisis efektivitas sistem pembelajaran online selama masa pandemi',
-          category: 'Evaluasi',
-          status: 'completed',
-          priority: 'low',
-          createdAt: '2023-12-20T08:00:00Z',
-          updatedAt: '2024-01-05T16:00:00Z',
-          authorId: user?.id || '1',
-          author: {
-            name: user?.name || 'John Doe',
-            email: user?.email || 'john@example.com',
-            avatar_url: user?.avatar_url,
-          },
-          wordCount: 6500,
-          targetWords: 6000,
-          deadline: '2024-01-15',
-        },
-      ];
+      const result = await WriterSessionService.getAllWriterSessions();
+      
+      if (result.error) {
+        throw new Error(result.error);
+      }
 
-      setProjects(mockProjects);
-      calculateStats(mockProjects);
-    } catch (error) {
-      console.error('Error loading projects:', error);
+      setSessions(result.data || []);
+    } catch (error: any) {
+      console.error('Error loading writer sessions:', error);
       notifications.show({
         title: 'Error',
-        message: 'Gagal memuat data proyek',
+        message: 'Gagal memuat data writer sessions',
         color: 'red',
       });
     } finally {
@@ -170,370 +89,452 @@ export default function ProjectWriterPage() {
     }
   };
 
-  const calculateStats = (projects: Project[]) => {
-    const stats: ProjectStats = {
-      totalProjects: projects.length,
-      draftProjects: projects.filter((p) => p.status === 'draft').length,
-      inProgressProjects: projects.filter((p) => p.status === 'in-progress').length,
-      completedProjects: projects.filter((p) => p.status === 'completed').length,
-      totalWords: projects.reduce((sum, p) => sum + p.wordCount, 0),
-      averageProgress: projects.length > 0 ? projects.reduce((sum, p) => sum + (p.wordCount / p.targetWords) * 100, 0) / projects.length : 0,
-    };
-    setStats(stats);
+  const loadStats = async () => {
+    try {
+      const result = await WriterSessionService.getWriterSessionStats();
+      
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      if (result.data) {
+        // Get user-specific sessions count
+        const userSessionsCount = sessions.filter(s => s.userId === user?.id).length;
+        
+        setStats({
+          totalSessions: result.data.totalSessions,
+          recentSessions: result.data.recentSessions,
+          activeSessions: result.data.activeSessions,
+          userSessions: userSessionsCount,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error loading stats:', error);
+    }
   };
 
   const handleSubmit = async () => {
     try {
-      if (!formData.title.trim() || !formData.description.trim()) {
+      if (!formData.title.trim()) {
         notifications.show({
           title: 'Error',
-          message: 'Judul dan deskripsi harus diisi',
+          message: 'Judul harus diisi',
           color: 'red',
         });
         return;
       }
 
-      // Simulate API call
-      const newProject: Project = {
-        id: Date.now().toString(),
-        ...formData,
-        status: 'draft',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        authorId: user?.id || '1',
-        author: {
-          name: user?.name || 'John Doe',
-          email: user?.email || 'john@example.com',
-          avatar_url: user?.avatar_url,
-        },
-        wordCount: 0,
-      };
+      if (!user?.id) {
+        notifications.show({
+          title: 'Error',
+          message: 'User tidak valid',
+          color: 'red',
+        });
+        return;
+      }
 
-      setProjects((prev) => [newProject, ...prev]);
-      calculateStats([newProject, ...projects]);
+      let result;
+      if (editingSession) {
+        result = await WriterSessionService.updateWriterSession(editingSession.id, {
+          title: formData.title,
+          description: formData.description || null,
+          coverColor: formData.coverColor,
+        });
+      } else {
+        result = await WriterSessionService.createWriterSession({
+          title: formData.title,
+          description: formData.description || null,
+          userId: user.id,
+          coverColor: formData.coverColor,
+        });
+      }
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      // Reload data
+      await loadWriterSessions();
+      await loadStats();
 
       // Reset form
       setFormData({
         title: '',
         description: '',
-        category: '',
-        priority: 'medium',
-        targetWords: 1000,
-        deadline: '',
+        coverColor: '#4c6ef5',
       });
-
+      setEditingSession(null);
       close();
+
       notifications.show({
         title: 'Berhasil',
-        message: 'Proyek berhasil dibuat',
+        message: editingSession ? 'Writer session berhasil diupdate' : 'Writer session berhasil dibuat',
         color: 'green',
       });
-    } catch (error) {
-      console.error('Error creating project:', error);
+    } catch (error: any) {
+      console.error('Error saving writer session:', error);
       notifications.show({
         title: 'Error',
-        message: 'Gagal membuat proyek',
+        message: error.message || 'Gagal menyimpan writer session',
         color: 'red',
       });
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'draft':
-        return 'gray';
-      case 'in-progress':
-        return 'blue';
-      case 'review':
-        return 'orange';
-      case 'completed':
-        return 'green';
-      default:
-        return 'gray';
+  const handleEdit = (session: WriterSession) => {
+    setEditingSession(session);
+    setFormData({
+      title: session.title,
+      description: session.description || '',
+      coverColor: session.coverColor,
+    });
+    open();
+  };
+
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    try {
+      const result = await WriterSessionService.deleteWriterSession(id);
+      
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      await loadWriterSessions();
+      await loadStats();
+
+      notifications.show({
+        title: 'Berhasil',
+        message: 'Writer session berhasil dihapus',
+        color: 'green',
+      });
+    } catch (error: any) {
+      console.error('Error deleting writer session:', error);
+      notifications.show({
+        title: 'Error',
+        message: error.message || 'Gagal menghapus writer session',
+        color: 'red',
+      });
+    } finally {
+      setDeletingId(null);
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'low':
-        return 'green';
-      case 'medium':
-        return 'yellow';
-      case 'high':
-        return 'red';
-      default:
-        return 'gray';
-    }
+  const openNewSessionModal = () => {
+    setEditingSession(null);
+    setFormData({
+      title: '',
+      description: '',
+      coverColor: '#4c6ef5',
+    });
+    open();
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'draft':
-        return 'Draft';
-      case 'in-progress':
-        return 'Sedang Dikerjakan';
-      case 'review':
-        return 'Review';
-      case 'completed':
-        return 'Selesai';
-      default:
-        return status;
-    }
-  };
-
-  const getPriorityLabel = (priority: string) => {
-    switch (priority) {
-      case 'low':
-        return 'Rendah';
-      case 'medium':
-        return 'Sedang';
-      case 'high':
-        return 'Tinggi';
-      default:
-        return priority;
-    }
-  };
-
-  // Filter and sort projects
-  const filteredProjects = projects
-    .filter((project) => {
-      const matchesSearch = project.title.toLowerCase().includes(searchTerm.toLowerCase()) || project.description.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = filterStatus === 'all' || project.status === filterStatus;
-      return matchesSearch && matchesStatus;
-    })
+  // Filter and sort sessions
+  const filteredSessions = sessions
+    .filter(session => 
+      session.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      session.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      session.user?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
     .sort((a, b) => {
       const aValue = a[sortBy];
       const bValue = b[sortBy];
-      const modifier = sortOrder === 'asc' ? 1 : -1;
-
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return aValue.localeCompare(bValue) * modifier;
+      
+      if (sortOrder === 'asc') {
+        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+      } else {
+        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
       }
-
-      return (aValue < bValue ? -1 : aValue > bValue ? 1 : 0) * modifier;
     });
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('id-ID', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getTimeSince = (dateString: string) => {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'Baru saja';
+    if (diffInHours < 24) return `${diffInHours} jam lalu`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) return `${diffInDays} hari lalu`;
+    const diffInWeeks = Math.floor(diffInDays / 7);
+    return `${diffInWeeks} minggu lalu`;
+  };
 
   if (loading) {
     return (
-      <Center h={400}>
-        <Loader size="lg" />
+      <Center h={500}>
+        <Stack align="center">
+          <Loader size="lg" />
+          <Text>Memuat writer sessions...</Text>
+        </Stack>
       </Center>
     );
   }
 
-  const statCards = [
-    {
-      title: 'Total Proyek',
-      value: stats.totalProjects,
-      icon: IconFileText,
-      color: 'blue',
-    },
-    {
-      title: 'Sedang Dikerjakan',
-      value: stats.inProgressProjects,
-      icon: IconClock,
-      color: 'orange',
-    },
-    {
-      title: 'Selesai',
-      value: stats.completedProjects,
-      icon: IconCheck,
-      color: 'green',
-    },
-    {
-      title: 'Total Kata',
-      value: stats.totalWords.toLocaleString(),
-      icon: IconPencil,
-      color: 'violet',
-    },
-  ];
-
   return (
-    <Stack gap="xl">
+    <Stack gap="lg">
+      {/* Header */}
       <Group justify="space-between">
         <div>
           <Title order={2}>Project Writer</Title>
-          <Text c="gray.6">Kelola proyek penulisan naskah akademik Anda</Text>
+          <Text c="dimmed">Kelola sesi penulisan dan proyek draft</Text>
         </div>
-        <Button leftSection={<IconPlus size={16} />} onClick={open}>
-          Buat Proyek Baru
+        <Button leftSection={<IconPlus size={16} />} onClick={openNewSessionModal}>
+          Buat Writer Session
         </Button>
       </Group>
 
       {/* Stats Cards */}
-      <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="lg">
-        {statCards.map((stat, index) => (
-          <Card key={index} withBorder shadow="sm" radius="md" p="lg">
-            <Group justify="space-between">
-              <div>
-                <Text c="gray.6" size="sm" fw={500} tt="uppercase">
-                  {stat.title}
-                </Text>
-                <Text fw={700} size="xl">
-                  {stat.value}
-                </Text>
-              </div>
-              <ThemeIcon color={stat.color} variant="light" size="xl" radius="md">
-                <stat.icon size={28} />
-              </ThemeIcon>
-            </Group>
-          </Card>
-        ))}
+      <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="md">
+        <Card withBorder p="md">
+          <Group justify="space-between">
+            <div>
+              <Text size="sm" c="dimmed">Total Sessions</Text>
+              <Text size="xl" fw={700}>{stats.totalSessions}</Text>
+            </div>
+            <ThemeIcon color="blue" variant="light" size="lg">
+              <IconFileText size={20} />
+            </ThemeIcon>
+          </Group>
+        </Card>
+
+        <Card withBorder p="md">
+          <Group justify="space-between">
+            <div>
+              <Text size="sm" c="dimmed">Recent (30 days)</Text>
+              <Text size="xl" fw={700}>{stats.recentSessions}</Text>
+            </div>
+            <ThemeIcon color="green" variant="light" size="lg">
+              <IconCalendar size={20} />
+            </ThemeIcon>
+          </Group>
+        </Card>
+
+        <Card withBorder p="md">
+          <Group justify="space-between">
+            <div>
+              <Text size="sm" c="dimmed">Active (7 days)</Text>
+              <Text size="xl" fw={700}>{stats.activeSessions}</Text>
+            </div>
+            <ThemeIcon color="orange" variant="light" size="lg">
+              <IconClock size={20} />
+            </ThemeIcon>
+          </Group>
+        </Card>
+
+        <Card withBorder p="md">
+          <Group justify="space-between">
+            <div>
+              <Text size="sm" c="dimmed">My Sessions</Text>
+              <Text size="xl" fw={700}>{sessions.filter(s => s.userId === user?.id).length}</Text>
+            </div>
+            <ThemeIcon color="violet" variant="light" size="lg">
+              <IconUser size={20} />
+            </ThemeIcon>
+          </Group>
+        </Card>
       </SimpleGrid>
 
-      {/* Progress Overview */}
-      <Card withBorder shadow="sm" radius="md" p="lg">
-        <Group justify="space-between" mb="md">
-          <Title order={4}>Progress Keseluruhan</Title>
-          <Badge variant="light" size="lg">
-            {stats.averageProgress.toFixed(1)}% Rata-rata
-          </Badge>
-        </Group>
-        <Progress value={stats.averageProgress} size="lg" radius="md" />
-      </Card>
-
-      {/* Filters and Search */}
-      <Card withBorder shadow="sm" radius="md" p="lg">
-        <Group justify="space-between" mb="md">
-          <Title order={4}>Daftar Proyek</Title>
-          <Group>
-            <TextInput placeholder="Cari proyek..." leftSection={<IconSearch size={16} />} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} w={250} />
+      {/* Search and Filter */}
+      <Paper withBorder p="md">
+        <Group justify="space-between">
+          <TextInput
+            placeholder="Cari writer sessions..."
+            leftSection={<IconSearch size={16} />}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ flex: 1 }}
+          />
+          <Group gap="xs">
             <Select
-              placeholder="Filter Status"
+              placeholder="Sort by"
               data={[
-                { value: 'all', label: 'Semua Status' },
-                { value: 'draft', label: 'Draft' },
-                { value: 'in-progress', label: 'Sedang Dikerjakan' },
-                { value: 'review', label: 'Review' },
-                { value: 'completed', label: 'Selesai' },
+                { value: 'lastActivity', label: 'Last Activity' },
+                { value: 'createdAt', label: 'Created Date' },
+                { value: 'title', label: 'Title' },
               ]}
-              value={filterStatus}
-              onChange={(value) => setFilterStatus(value || 'all')}
-              leftSection={<IconFilter size={16} />}
-              w={180}
+              value={sortBy}
+              onChange={(value) => setSortBy(value as any)}
+              w={150}
             />
+            <ActionIcon 
+              variant="light" 
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            >
+              {sortOrder === 'asc' ? <IconSortAscending size={16} /> : <IconSortDescending size={16} />}
+            </ActionIcon>
           </Group>
         </Group>
+      </Paper>
 
-        {/* Projects Grid */}
-        {filteredProjects.length === 0 ? (
-          <Alert icon={<IconAlertCircle size={16} />} title="Tidak ada proyek">
-            {searchTerm || filterStatus !== 'all' ? 'Tidak ada proyek yang sesuai dengan filter yang dipilih.' : 'Belum ada proyek yang dibuat. Klik tombol "Buat Proyek Baru" untuk memulai.'}
-          </Alert>
-        ) : (
-          <SimpleGrid cols={{ base: 1, md: 2, lg: 3 }} spacing="lg">
-            {filteredProjects.map((project) => (
-              <Card key={project.id} withBorder shadow="sm" radius="md" p="lg">
-                <Stack gap="md">
-                  <Group justify="space-between" align="flex-start">
-                    <div style={{ flex: 1 }}>
-                      <Text fw={600} size="lg" lineClamp={2}>
-                        {project.title}
-                      </Text>
-                      <Text size="sm" c="gray.6" lineClamp={2} mt={4}>
-                        {project.description}
-                      </Text>
-                    </div>
-                    <Menu shadow="md" width={150}>
-                      <Menu.Target>
-                        <ActionIcon variant="subtle" color="gray">
-                          <IconEdit size={16} />
-                        </ActionIcon>
-                      </Menu.Target>
-                      <Menu.Dropdown>
-                        <Menu.Item leftSection={<IconEye size={14} />}>Lihat Detail</Menu.Item>
-                        <Menu.Item leftSection={<IconEdit size={14} />}>Edit</Menu.Item>
-                        <Menu.Item leftSection={<IconDownload size={14} />}>Download</Menu.Item>
-                        <Menu.Divider />
-                        <Menu.Item leftSection={<IconTrash size={14} />} color="red">
-                          Hapus
-                        </Menu.Item>
-                      </Menu.Dropdown>
-                    </Menu>
-                  </Group>
-
-                  <Group gap="xs">
-                    <Badge color={getStatusColor(project.status)} variant="light" size="sm">
-                      {getStatusLabel(project.status)}
-                    </Badge>
-                    <Badge color={getPriorityColor(project.priority)} variant="outline" size="sm">
-                      {getPriorityLabel(project.priority)}
-                    </Badge>
-                    {project.category && (
-                      <Badge variant="filled" size="sm" color="gray">
-                        {project.category}
-                      </Badge>
-                    )}
-                  </Group>
-
-                  <div>
-                    <Group justify="space-between" mb="xs">
-                      <Text size="sm" c="gray.6">
-                        Progress Penulisan
-                      </Text>
-                      <Text size="sm" fw={500}>
-                        {project.wordCount.toLocaleString()} / {project.targetWords.toLocaleString()} kata
-                      </Text>
+      {/* Sessions Table */}
+      <Paper withBorder>
+        <ScrollArea>
+          <Table striped highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Session</Table.Th>
+                <Table.Th>Author</Table.Th>
+                <Table.Th>Created</Table.Th>
+                <Table.Th>Last Activity</Table.Th>
+                <Table.Th>Actions</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {filteredSessions.map((session) => (
+                <Table.Tr key={session.id}>
+                  <Table.Td>
+                    <Group gap="sm">
+                      <Box
+                        w={12}
+                        h={12}
+                        style={{
+                          backgroundColor: session.coverColor,
+                          borderRadius: 2,
+                        }}
+                      />
+                      <div>
+                        <Text fw={500} size="sm">{session.title}</Text>
+                        {session.description && (
+                          <Text size="xs" c="dimmed" lineClamp={1}>
+                            {session.description}
+                          </Text>
+                        )}
+                      </div>
                     </Group>
-                    <Progress value={(project.wordCount / project.targetWords) * 100} size="md" color={project.wordCount >= project.targetWords ? 'green' : 'blue'} />
-                  </div>
+                  </Table.Td>
 
-                  <Group justify="space-between" align="center">
+                  <Table.Td>
                     <Group gap="xs">
-                      <IconCalendar size={14} color="gray" />
-                      <Text size="xs" c="gray.5">
-                        {new Date(project.createdAt).toLocaleDateString('id-ID')}
-                      </Text>
+                      <Avatar size="sm" src={session.user?.avatar_url}>
+                        {session.user?.name?.charAt(0) || 'U'}
+                      </Avatar>
+                      <div>
+                        <Text size="sm">{session.user?.name || 'Unknown'}</Text>
+                        <Text size="xs" c="dimmed">{session.user?.email}</Text>
+                      </div>
                     </Group>
-                    {project.deadline && (
-                      <Group gap="xs">
-                        <IconTarget size={14} color="red" />
-                        <Text size="xs" c="red">
-                          {new Date(project.deadline).toLocaleDateString('id-ID')}
-                        </Text>
-                      </Group>
-                    )}
-                  </Group>
-                </Stack>
-              </Card>
-            ))}
-          </SimpleGrid>
+                  </Table.Td>
+
+                  <Table.Td>
+                    <Text size="sm">{formatDate(session.createdAt)}</Text>
+                  </Table.Td>
+
+                  <Table.Td>
+                    <Group gap="xs">
+                      <Text size="sm">{formatDate(session.lastActivity)}</Text>
+                      <Badge size="xs" variant="light" color="gray">
+                        {getTimeSince(session.lastActivity)}
+                      </Badge>
+                    </Group>
+                  </Table.Td>
+
+                  <Table.Td>
+                    <Group gap="xs">
+                      <ActionIcon
+                        variant="light"
+                        color="blue"
+                        onClick={() => handleEdit(session)}
+                      >
+                        <IconEdit size={16} />
+                      </ActionIcon>
+                      <ActionIcon
+                        variant="light"
+                        color="red"
+                        loading={deletingId === session.id}
+                        onClick={() => handleDelete(session.id)}
+                      >
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Group>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </ScrollArea>
+
+        {filteredSessions.length === 0 && (
+          <Box p="xl">
+            <Stack align="center">
+              <ThemeIcon size="xl" variant="light" color="gray">
+                <IconFileText size={28} />
+              </ThemeIcon>
+              <Text fw={600} c="gray.6">
+                {searchTerm ? 'Tidak ada session yang sesuai pencarian' : 'Belum ada writer sessions'}
+              </Text>
+              <Text size="sm" c="gray.5">
+                {searchTerm ? 'Coba ubah kata kunci pencarian' : 'Mulai dengan membuat writer session baru'}
+              </Text>
+              {!searchTerm && (
+                <Button leftSection={<IconPlus size={16} />} onClick={openNewSessionModal}>
+                  Buat Writer Session
+                </Button>
+              )}
+            </Stack>
+          </Box>
         )}
-      </Card>
+      </Paper>
 
-      {/* Create/Edit Project Modal */}
-      <Modal opened={opened} onClose={close} title={editingProject ? 'Edit Proyek' : 'Buat Proyek Baru'} size="lg">
+      {/* Create/Edit Modal */}
+      <Modal
+        opened={opened}
+        onClose={close}
+        title={editingSession ? 'Edit Writer Session' : 'Buat Writer Session Baru'}
+        size="md"
+      >
         <Stack gap="md">
-          <TextInput label="Judul Proyek" placeholder="Masukkan judul proyek..." value={formData.title} onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))} required />
+          <TextInput
+            label="Judul Session"
+            placeholder="Masukkan judul writer session"
+            required
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+          />
 
-          <Textarea label="Deskripsi" placeholder="Deskripsi proyek..." value={formData.description} onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))} minRows={3} required />
+          <Textarea
+            label="Deskripsi"
+            placeholder="Jelaskan tujuan dan konten session ini"
+            minRows={3}
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          />
 
-          <Group grow>
-            <TextInput label="Kategori" placeholder="Penelitian, Studi Kasus, dll." value={formData.category} onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value }))} />
-
-            <Select
-              label="Prioritas"
-              data={[
-                { value: 'low', label: 'Rendah' },
-                { value: 'medium', label: 'Sedang' },
-                { value: 'high', label: 'Tinggi' },
-              ]}
-              value={formData.priority}
-              onChange={(value) => setFormData((prev) => ({ ...prev, priority: value as any }))}
-            />
-          </Group>
-
-          <Group grow>
-            <TextInput label="Target Jumlah Kata" type="number" value={formData.targetWords} onChange={(e) => setFormData((prev) => ({ ...prev, targetWords: Number(e.target.value) }))} min={0} />
-
-            <TextInput label="Deadline (Opsional)" type="date" value={formData.deadline} onChange={(e) => setFormData((prev) => ({ ...prev, deadline: e.target.value }))} />
-          </Group>
+          <div>
+            <Text size="sm" fw={500} mb="xs">Cover Color</Text>
+            <Group gap="xs">
+              {['#4c6ef5', '#37b24d', '#f59f00', '#e03131', '#7c2d12', '#1971c2'].map((color) => (
+                <ActionIcon
+                  key={color}
+                  variant={formData.coverColor === color ? 'filled' : 'light'}
+                  color={color.replace('#', '')}
+                  onClick={() => setFormData({ ...formData, coverColor: color })}
+                  style={{ backgroundColor: color }}
+                >
+                  {formData.coverColor === color && <IconCheck size={16} />}
+                </ActionIcon>
+              ))}
+            </Group>
+          </div>
 
           <Group justify="flex-end" mt="md">
             <Button variant="light" onClick={close}>
               Batal
             </Button>
-            <Button onClick={handleSubmit}>{editingProject ? 'Update' : 'Buat Proyek'}</Button>
+            <Button onClick={handleSubmit} disabled={!formData.title.trim()}>
+              {editingSession ? 'Update' : 'Buat'} Session
+            </Button>
           </Group>
         </Stack>
       </Modal>

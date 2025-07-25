@@ -1,4 +1,4 @@
-// src/lib/dashboard-config.ts - KONFIGURASI FITUR DASHBOARD
+// src/lib/dashboard-config.ts - UPDATED dengan project writer enabled
 // File ini mengatur fitur mana yang aktif berdasarkan ketersediaan table di database
 
 export interface FeatureConfig {
@@ -13,8 +13,9 @@ export interface DashboardConfig {
     articleManagement: FeatureConfig;
     assignmentManagement: FeatureConfig;
     profileManagement: FeatureConfig;
-    // FITUR YANG DISABLED KARENA TABLE BELUM ADA
+    // FITUR YANG SEKARANG ENABLED
     projectWriter: FeatureConfig;
+    // FITUR YANG MASIH DISABLED
     brainstormingSession: FeatureConfig;
     nodeEdgeManagement: FeatureConfig;
     analyticsAdvanced: FeatureConfig;
@@ -45,16 +46,12 @@ export const dashboardConfig: DashboardConfig = {
       enabled: true,
     },
 
-    // ❌ FITUR YANG DISABLED (Table ada di Prisma tapi belum diimplementasi)
+    // ✅ NEWLY ENABLED - Project Writer & Brainstorming
     projectWriter: {
-      enabled: false,
-      reason: 'Table WriterSession dan Draft tersedia di database',
-      comingSoon: true,
+      enabled: true, // ENABLED karena WriterSession table ready
     },
     brainstormingSession: {
-      enabled: false,
-      reason: 'Table BrainstormingSession dan ChatMessage tersedia di database',
-      comingSoon: true,
+      enabled: true, // ENABLED karena BrainstormingSession table ready
     },
     nodeEdgeManagement: {
       enabled: false,
@@ -83,33 +80,17 @@ export const dashboardConfig: DashboardConfig = {
     },
   },
   ui: {
-    showDisabledFeatures: true, // Show disabled features with "Coming Soon" badge
+    showDisabledFeatures: true,
     showComingSoonBadge: true,
   },
 };
 
-// ✅ HELPER FUNCTIONS
+// Helper function untuk check feature enabled
 export const isFeatureEnabled = (featureName: keyof DashboardConfig['features']): boolean => {
   return dashboardConfig.features[featureName].enabled;
 };
 
-export const getFeatureStatus = (featureName: keyof DashboardConfig['features']) => {
-  return dashboardConfig.features[featureName];
-};
-
-export const getEnabledFeatures = () => {
-  return Object.entries(dashboardConfig.features)
-    .filter(([_, config]) => config.enabled)
-    .map(([name, _]) => name);
-};
-
-export const getDisabledFeatures = () => {
-  return Object.entries(dashboardConfig.features)
-    .filter(([_, config]) => !config.enabled)
-    .map(([name, config]) => ({ name, ...config }));
-};
-
-// ✅ NAVIGATION MENU CONFIGURATION
+// Navigation menu configuration
 export interface MenuItem {
   key: string;
   label: string;
@@ -163,27 +144,25 @@ export const navigationMenu: MenuItem[] = [
     description: 'Kelola profil dan pengaturan admin',
   },
 
-  // ❌ DISABLED FEATURES (Show with Coming Soon badge)
+  // ✅ ENABLED FEATURES
   {
     key: 'project-writer',
     label: 'Project Writer',
     icon: 'IconPencil',
     href: '/dashboard/project-writer',
-    enabled: isFeatureEnabled('projectWriter'),
-    comingSoon: !isFeatureEnabled('projectWriter'),
-    badge: 'Soon',
+    enabled: isFeatureEnabled('projectWriter'), // Now enabled!
     description: 'Kelola project dan draft penulisan',
   },
   {
     key: 'brainstorming',
     label: 'Brainstorming',
     icon: 'IconBulb',
-    href: '/dashboard/brainstorming',
-    enabled: isFeatureEnabled('brainstormingSession'),
-    comingSoon: !isFeatureEnabled('brainstormingSession'),
-    badge: 'Soon',
-    description: 'Session brainstorming dan chat AI',
+    href: '/dashboard/project-brainstorm', // Updated route
+    enabled: isFeatureEnabled('brainstormingSession'), // Now enabled!
+    description: 'Session brainstorming dan ide penelitian',
   },
+
+  // ❌ DISABLED FEATURES (Show with Coming Soon badge)
   {
     key: 'analytics',
     label: 'Analytics Advanced',
@@ -216,6 +195,8 @@ export const dashboardStats = {
     'totalArticles',
     'totalAssignments',
     'activeAssignments',
+    'totalWriterSessions', // Added for writer sessions
+    'totalBrainstormingSessions', // Added for brainstorming sessions
   ],
   // Stats yang tidak bisa diambil karena table belum ada
   unavailable: ['totalBrainstormingSessions', 'totalDrafts', 'totalAnnotations', 'totalTokenUsage', 'monthlyActiveUsers'],
